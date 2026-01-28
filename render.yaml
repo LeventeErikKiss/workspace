@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: event-storage-backend
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DB_FILE
+        value: /var/data/app.db
+      - key: CORS_ORIGIN
+        value: https://hookedirl.com,https://www.hookedirl.com,https://leventeirikikss.github.io
+    disk:
+      name: data
+      mountPath: /var/data
+      sizeGB: 1
