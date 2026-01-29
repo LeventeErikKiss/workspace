@@ -1944,17 +1944,6 @@
         <div id="loginForm">
             <h3>Log ind på siden</h3>
             <p style="color: #666; margin-bottom: 30px;">Vælg hvordan du ønsker at logge ind</p>
-
-            <div class="form-group">
-                <label for="loginEmail">E-mail:</label>
-                <input type="email" id="loginEmail" placeholder="din@email.dk">
-            </div>
-            <div class="form-group">
-                <label for="loginPassword">Adgangskode:</label>
-                <input type="password" id="loginPassword" placeholder="Din adgangskode">
-            </div>
-            <div id="loginError"></div>
-            <button onclick="handleLogin()">Log ind</button>
             
             <button class="mitid-button" onclick="handleMitIDLogin()">🔐 Log ind med MitID</button>
             
@@ -2289,7 +2278,7 @@
             <div class="settings-card settings-links">
                 <button type="button" onclick="openPolicy('privacy')">Privatlivspolitik</button>
                 <button type="button" onclick="openPolicy('terms')">Vilkår og betingelser</button>
-                <button type="button" class="logout-button" onclick="deleteAccount()">Slet konto</button>
+                <button type="button" id="deleteAccountBtn" class="logout-button" onclick="deleteAccount()">Slet konto</button>
             </div>
         </div>
 
@@ -2405,7 +2394,7 @@
     </div>
 
     <div id="footerMenu" class="footer-menu hidden">
-        <button type="button" aria-label="Venner" title="Venner" onclick="openFriendsPage()">👥</button>
+        <button type="button" id="footerFriendsBtn" aria-label="Venner" title="Venner" onclick="openFriendsPage()">👥</button>
         <button type="button" aria-label="Point Shop" title="Point Shop" onclick="openPointShop()">💎</button>
         <button type="button" class="footer-home" aria-label="Home" title="Home" onclick="goHome()">🏠</button>
         <button type="button" aria-label="Notifications" title="Notifications" onclick="openNotificationsPage()">🔔</button>
@@ -2703,6 +2692,10 @@
         }
 
         function awardPurchaseRewards(amountDkk, event) {
+            if (isGuestUser()) {
+                addNotification('Gæster kan ikke optjene point eller xp.');
+                return;
+            }
             if (!amountDkk || amountDkk <= 0) {
                 addNotification('Køb registreret, men pris mangler – ingen point/xp tilføjet.');
                 return;
@@ -3574,6 +3567,10 @@
         }
 
         async function openFriendsPage() {
+            if (isGuestUser()) {
+                addNotification('Gæster har ikke adgang til venner.');
+                return;
+            }
             document.getElementById('menu').classList.add('hidden');
             document.getElementById('profilePage').classList.add('hidden');
             document.getElementById('eventsPage').classList.add('hidden');
@@ -3596,6 +3593,7 @@
 
             const nameInput = document.getElementById('settingsName');
             const emailInput = document.getElementById('settingsEmail');
+            const deleteBtn = document.getElementById('deleteAccountBtn');
             if (nameInput) {
                 nameInput.removeAttribute('readonly');
                 nameInput.removeAttribute('disabled');
@@ -3610,6 +3608,22 @@
                 const user = JSON.parse(currentUser);
                 if (nameInput) nameInput.value = user.name || '';
                 if (emailInput) emailInput.value = user.email || '';
+
+                if (user.isGuest) {
+                    if (nameInput) {
+                        nameInput.setAttribute('readonly', 'true');
+                        nameInput.setAttribute('disabled', 'true');
+                    }
+                    if (emailInput) {
+                        emailInput.setAttribute('readonly', 'true');
+                        emailInput.setAttribute('disabled', 'true');
+                    }
+                    if (deleteBtn) {
+                        deleteBtn.classList.add('hidden');
+                    }
+                } else if (deleteBtn) {
+                    deleteBtn.classList.remove('hidden');
+                }
             }
 
             if (nameInput) {
@@ -4063,6 +4077,11 @@
             const errorEl = document.getElementById('settingsError');
             if (errorEl) errorEl.innerHTML = '';
 
+            if (isGuestUser()) {
+                if (errorEl) errorEl.innerHTML = '<p class="error-message">Gæster kan ikke ændre navn eller e-mail</p>';
+                return;
+            }
+
             if (!name || !email) {
                 if (errorEl) errorEl.innerHTML = '<p class="error-message">Brugernavn og e-mail er påkrævet</p>';
                 return;
@@ -4465,7 +4484,8 @@
         }
 
         function clearErrors() {
-            document.getElementById('loginError').innerHTML = '';
+            const loginError = document.getElementById('loginError');
+            if (loginError) loginError.innerHTML = '';
             document.getElementById('registerError').innerHTML = '';
         }
 
@@ -4517,7 +4537,8 @@
             
             setTimeout(() => {
                 toggleForm();
-                document.getElementById('loginEmail').value = email;
+                const loginEmail = document.getElementById('loginEmail');
+                if (loginEmail) loginEmail.value = email;
                 document.getElementById('regName').value = '';
                 document.getElementById('regEmail').value = '';
                 document.getElementById('regPassword').value = '';
@@ -4767,6 +4788,11 @@
                     body: JSON.stringify({ name, email })
                 });
             }
+            if (isGuest) {
+                guestStats = { xp: 0, level: 1, points: 0 };
+                guestNotifications = [];
+                guestChats = {};
+            }
             await showDashboard(name, email, isGuest);
         }
 
@@ -4782,6 +4808,10 @@
             document.getElementById('settingsPage').classList.add('hidden');
             document.getElementById('friendsPage').classList.add('hidden');
             document.getElementById('footerMenu').classList.remove('hidden');
+            const friendsBtn = document.getElementById('footerFriendsBtn');
+            if (friendsBtn) {
+                friendsBtn.classList.toggle('hidden', isGuest);
+            }
             document.getElementById('pointShopPage').classList.add('hidden');
             document.getElementById('notificationsPage').classList.add('hidden');
             document.getElementById('chatPage').classList.add('hidden');
@@ -4826,8 +4856,10 @@
             document.getElementById('pointShopPage').classList.add('hidden');
             document.getElementById('notificationsPage').classList.add('hidden');
             document.getElementById('chatPage').classList.add('hidden');
-            document.getElementById('loginEmail').value = '';
-            document.getElementById('loginPassword').value = '';
+            const loginEmail = document.getElementById('loginEmail');
+            const loginPassword = document.getElementById('loginPassword');
+            if (loginEmail) loginEmail.value = '';
+            if (loginPassword) loginPassword.value = '';
             clearErrors();
             updateStatsUI({ xp: 0, level: 1, points: 0 });
         }
