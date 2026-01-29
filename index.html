@@ -2019,7 +2019,6 @@
                         <div class="avatar-info">
                             <p class="avatar-name" id="avatarName">Bruger</p>
                             <p class="avatar-status">Logget ind</p>
-                            <p class="avatar-level" id="avatarLevel">Niveau 5</p>
                         </div>
                     </div>
                     <div class="header-stats">
@@ -2721,8 +2720,6 @@
             if (headerPoints) headerPoints.textContent = stats.points;
             if (shopPoints) shopPoints.textContent = stats.points;
             if (headerLevel) headerLevel.textContent = stats.level;
-            const levelLabel = document.getElementById('avatarLevel');
-            if (levelLabel) levelLabel.textContent = `Niveau ${stats.level}`;
         }
 
         function addNotification(text) {
@@ -4811,6 +4808,10 @@
             const friendsBtn = document.getElementById('footerFriendsBtn');
             if (friendsBtn) {
                 friendsBtn.classList.toggle('hidden', isGuest);
+            }
+            const headerStats = document.querySelector('.header-stats');
+            if (headerStats) {
+                headerStats.classList.toggle('hidden', isGuest);
             }
             document.getElementById('pointShopPage').classList.add('hidden');
             document.getElementById('notificationsPage').classList.add('hidden');
