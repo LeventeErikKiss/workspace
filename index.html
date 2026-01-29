@@ -1658,6 +1658,242 @@
             font-size: 12px;
             color: #666;
         }
+
+        .header-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-left: 12px;
+        }
+
+        .level-badge,
+        .points-badge {
+            background-color: rgba(255, 255, 255, 0.25);
+            color: white;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .pointshop-page,
+        .notifications-page,
+        .chat-page {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 20px;
+            padding-bottom: 90px;
+            background-color: #f5f5f5;
+            min-height: calc(100vh - 100px);
+        }
+
+        .pointshop-header,
+        .notifications-header,
+        .chat-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background-color: #E94B28;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            color: white;
+        }
+
+        .pointshop-header button,
+        .notifications-header button,
+        .chat-header button {
+            padding: 10px 20px;
+            background-color: rgba(255,255,255,0.3);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background-color 0.2s;
+            font-size: 14px;
+        }
+
+        .pointshop-header button:hover,
+        .notifications-header button:hover,
+        .chat-header button:hover {
+            background-color: rgba(255,255,255,0.5);
+        }
+
+        .pointshop-tabs {
+            display: flex;
+            gap: 10px;
+        }
+
+        .shop-tab {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background-color: #ffffff;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: var(--shadow-soft);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .shop-tab.active {
+            background: linear-gradient(135deg, #1f9ea6 0%, #2BC4A9 100%);
+            color: white;
+        }
+
+        .shop-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+        }
+
+        .shop-item {
+            background-color: white;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: var(--shadow-soft);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            border: var(--border-soft);
+        }
+
+        .shop-item h4 {
+            margin: 0;
+            color: #333;
+        }
+
+        .shop-item p {
+            margin: 0;
+            color: #666;
+            font-size: 13px;
+        }
+
+        .shop-item button {
+            width: 100%;
+            padding: 10px;
+            border-radius: 6px;
+            background-color: var(--brand-coral);
+            font-weight: 700;
+        }
+
+        .notifications-card,
+        .chat-card {
+            background-color: var(--surface);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: var(--shadow-soft);
+            border: var(--border-soft);
+        }
+
+        .notifications-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            display: grid;
+            gap: 12px;
+        }
+
+        .notifications-list li {
+            padding: 12px;
+            border-radius: 8px;
+            background-color: #f7f7f7;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .chat-body {
+            display: grid;
+            grid-template-columns: 260px 1fr;
+            gap: 16px;
+        }
+
+        .chat-sidebar {
+            background-color: white;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: var(--shadow-soft);
+            display: grid;
+            gap: 10px;
+            border: var(--border-soft);
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+
+        .chat-contact {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            background-color: #f7f7f7;
+        }
+
+        .chat-contact.active {
+            background-color: rgba(43, 196, 169, 0.2);
+            font-weight: bold;
+        }
+
+        .chat-panel {
+            background-color: white;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: var(--shadow-soft);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            border: var(--border-soft);
+            min-height: 60vh;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            display: grid;
+            gap: 8px;
+        }
+
+        .chat-message {
+            padding: 10px 12px;
+            border-radius: 12px;
+            max-width: 75%;
+            font-size: 14px;
+        }
+
+        .chat-message.self {
+            background-color: rgba(233, 75, 40, 0.15);
+            align-self: flex-end;
+        }
+
+        .chat-message.other {
+            background-color: rgba(43, 196, 169, 0.18);
+            align-self: flex-start;
+        }
+
+        .chat-input {
+            display: flex;
+            gap: 8px;
+        }
+
+        .chat-input input {
+            flex: 1;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            font-size: 14px;
+        }
+
+        @media (max-width: 900px) {
+            .chat-body {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1746,6 +1982,10 @@
                             <p class="avatar-status">Logget ind</p>
                             <p class="avatar-level" id="avatarLevel">Niveau 5</p>
                         </div>
+                    </div>
+                    <div class="header-stats">
+                        <div class="level-badge">Lvl <span id="headerLevel">1</span></div>
+                        <div class="points-badge">🪙 <span id="headerPoints">0</span></div>
                     </div>
                 </div>
                 <div class="menu-center">
@@ -2003,6 +2243,54 @@
             </div>
         </div>
 
+        <!-- Point Shop Page -->
+        <div id="pointShopPage" class="hidden pointshop-page">
+            <div class="pointshop-header">
+                <button onclick="closePointShop()">← Tilbage</button>
+                <h2 style="flex: 1; text-align: center; margin: 0; color: white;">Point Shop</h2>
+                <div class="points-badge">🪙 <span id="shopPoints">0</span></div>
+            </div>
+
+            <div class="pointshop-tabs">
+                <button class="shop-tab active" data-shop-tab="points" onclick="switchShopTab('points')">Point items</button>
+                <button class="shop-tab" data-shop-tab="dkk" onclick="switchShopTab('dkk')">Køb for DKK</button>
+            </div>
+
+            <div class="pointshop-content">
+                <div id="shopPointsGrid" class="shop-grid"></div>
+                <div id="shopDkkGrid" class="shop-grid hidden"></div>
+            </div>
+        </div>
+
+        <!-- Notifications Page -->
+        <div id="notificationsPage" class="hidden notifications-page">
+            <div class="notifications-header">
+                <button onclick="closeNotificationsPage()">← Tilbage</button>
+                <h2 style="flex: 1; text-align: center; margin: 0; color: white;">Notifikationer</h2>
+            </div>
+            <div class="notifications-card">
+                <ul id="notificationsList" class="notifications-list"></ul>
+            </div>
+        </div>
+
+        <!-- Chat Page -->
+        <div id="chatPage" class="hidden chat-page">
+            <div class="chat-header">
+                <button onclick="closeChatPage()">← Tilbage</button>
+                <h2 style="flex: 1; text-align: center; margin: 0; color: white;">Beskeder</h2>
+            </div>
+            <div class="chat-body">
+                <div class="chat-sidebar" id="chatContacts"></div>
+                <div class="chat-panel">
+                    <div id="chatMessages" class="chat-messages"></div>
+                    <div class="chat-input">
+                        <input type="text" id="chatInput" placeholder="Skriv en besked...">
+                        <button type="button" onclick="sendChatMessage()">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Old Dashboard (shown after login) -->
         <div id="dashboard" class="hidden dashboard">
             <h2>Velkommen!</h2>
@@ -2070,8 +2358,8 @@
         <button type="button" aria-label="Venner" title="Venner" onclick="openFriendsPage()">👥</button>
         <button type="button" aria-label="Point Shop" title="Point Shop" onclick="openPointShop()">💎</button>
         <button type="button" class="footer-home" aria-label="Home" title="Home" onclick="goHome()">🏠</button>
-        <button type="button" aria-label="Notifications" title="Notifications">🔔</button>
-        <button type="button" aria-label="Privat beskeder" title="Privat beskeder">💬</button>
+        <button type="button" aria-label="Notifications" title="Notifications" onclick="openNotificationsPage()">🔔</button>
+        <button type="button" aria-label="Privat beskeder" title="Privat beskeder" onclick="openChatPage()">💬</button>
     </div>
 
     <div id="friendModal" class="friend-modal">
@@ -2145,7 +2433,9 @@
                 city: event.city || '',
                 date: event.date || '',
                 rawDate: event.rawDate || '',
-                url: event.url || ''
+                url: event.url || '',
+                price: typeof event.price === 'number' ? event.price : null,
+                currency: event.currency || 'DKK'
             };
         }
 
@@ -2255,7 +2545,8 @@
                 link.textContent = event.name || 'Begivenhed';
 
                 const meta = document.createElement('span');
-                meta.textContent = `${event.city || 'Danmark'} · ${event.date || 'Dato TBA'}`;
+                const priceText = event.price ? ` · ${formatPrice(event.price, event.currency)}` : '';
+                meta.textContent = `${event.city || 'Danmark'} · ${event.date || 'Dato TBA'}${priceText}`;
 
                 main.appendChild(link);
                 main.appendChild(meta);
@@ -2276,6 +2567,336 @@
                 li.appendChild(row);
                 list.appendChild(li);
             });
+        }
+
+        function getUserKey() {
+            const current = getCurrentUser();
+            if (!current) return 'guest';
+            return current.email || 'guest';
+        }
+
+        function getUserStatsKey() {
+            return `userStats:${getUserKey()}`;
+        }
+
+        function getNotificationsKey() {
+            return `notifications:${getUserKey()}`;
+        }
+
+        function getChatKey(contactId) {
+            return `chat:${getUserKey()}:${contactId}`;
+        }
+
+        function getUserStats() {
+            const raw = localStorage.getItem(getUserStatsKey());
+            if (raw) {
+                try {
+                    return JSON.parse(raw);
+                } catch (e) {
+                    // ignore parse issues
+                }
+            }
+            return { xp: 0, level: 1, points: 0 };
+        }
+
+        function saveUserStats(stats) {
+            localStorage.setItem(getUserStatsKey(), JSON.stringify(stats));
+            updateStatsUI(stats);
+        }
+
+        function xpToNextLevel(level) {
+            return 100 + (level - 1) * 25;
+        }
+
+        function applyXp(stats, gainedXp) {
+            let xp = stats.xp + gainedXp;
+            let level = stats.level;
+            let needed = xpToNextLevel(level);
+            while (xp >= needed) {
+                xp -= needed;
+                level += 1;
+                needed = xpToNextLevel(level);
+            }
+            return { ...stats, xp, level };
+        }
+
+        function calculatePurchaseBonus(level) {
+            const base = 10 + level;
+            let percent = 0.5;
+            if (level >= 16 && level <= 30) {
+                percent = 0.25;
+            } else if (level >= 31) {
+                percent = 0.01;
+            }
+            const bonus = Math.round(base * percent);
+            return { base, bonus, percent };
+        }
+
+        function awardPurchaseRewards(amountDkk, event) {
+            if (!amountDkk || amountDkk <= 0) {
+                addNotification('Køb registreret, men pris mangler – ingen point/xp tilføjet.');
+                return;
+            }
+
+            const stats = getUserStats();
+            const roundedAmount = Math.round(amountDkk);
+            const bonus = calculatePurchaseBonus(stats.level);
+            const totalXp = roundedAmount + bonus.base + bonus.bonus;
+
+            let updated = { ...stats, points: stats.points + roundedAmount };
+            updated = applyXp(updated, totalXp);
+            saveUserStats(updated);
+
+            const eventName = event?.name ? ` for ${event.name}` : '';
+            addNotification(`Køb gennemført${eventName}. +${roundedAmount} point og +${totalXp} xp.`);
+        }
+
+        function updateStatsUI(stats = getUserStats()) {
+            const headerPoints = document.getElementById('headerPoints');
+            const headerLevel = document.getElementById('headerLevel');
+            const shopPoints = document.getElementById('shopPoints');
+            if (headerPoints) headerPoints.textContent = stats.points;
+            if (shopPoints) shopPoints.textContent = stats.points;
+            if (headerLevel) headerLevel.textContent = stats.level;
+            const levelLabel = document.getElementById('avatarLevel');
+            if (levelLabel) levelLabel.textContent = `Niveau ${stats.level}`;
+        }
+
+        function addNotification(text) {
+            const list = getNotifications();
+            const stamp = new Date().toLocaleString('da-DK', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' });
+            list.unshift({ text, stamp });
+            localStorage.setItem(getNotificationsKey(), JSON.stringify(list.slice(0, 50)));
+            renderNotifications();
+        }
+
+        function getNotifications() {
+            const raw = localStorage.getItem(getNotificationsKey());
+            if (!raw) return [];
+            try {
+                return JSON.parse(raw) || [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function renderNotifications() {
+            const list = document.getElementById('notificationsList');
+            if (!list) return;
+            list.innerHTML = '';
+            const items = getNotifications();
+            if (items.length === 0) {
+                const li = document.createElement('li');
+                li.textContent = 'Ingen notifikationer endnu.';
+                list.appendChild(li);
+                return;
+            }
+            items.forEach(item => {
+                const li = document.createElement('li');
+                li.textContent = `${item.text} (${item.stamp})`;
+                list.appendChild(li);
+            });
+        }
+
+        const pointShopItems = [
+            { id: 'skin_fire', name: '🔥 Flamme Outfit', description: 'Unikt outfit til din avatar.', price: 350 },
+            { id: 'pet_dragon', name: '🐉 Mini Drage', description: 'Følgesvend til din profil.', price: 520 },
+            { id: 'badge_gold', name: '🥇 Guld Badge', description: 'Vis dit niveau frem.', price: 180 },
+            { id: 'theme_neon', name: '🌈 Neon Tema', description: 'Skift farvetema.', price: 260 }
+        ];
+
+        const dkkShopItems = [
+            { id: 'vip_pass', name: '🎫 VIP Pass', description: 'Adgang til eksklusive events.', price: 129 },
+            { id: 'pro_avatar', name: '✨ Pro Avatar Pack', description: 'Ekstra tilpasninger.', price: 79 },
+            { id: 'supporter', name: '❤️ Supporter Pack', description: 'Støt projektet.', price: 49 }
+        ];
+
+        function renderShopItems(items, container, mode) {
+            if (!container) return;
+            container.innerHTML = '';
+            items.forEach(item => {
+                const card = document.createElement('div');
+                card.className = 'shop-item';
+
+                const title = document.createElement('h4');
+                title.textContent = item.name;
+
+                const desc = document.createElement('p');
+                desc.textContent = item.description;
+
+                const price = document.createElement('p');
+                price.textContent = mode === 'points'
+                    ? `${item.price} point`
+                    : `${item.price} DKK`;
+
+                const btn = document.createElement('button');
+                btn.textContent = mode === 'points' ? 'Køb for point' : 'Køb for DKK';
+                btn.addEventListener('click', () => handleShopPurchase(item, mode));
+
+                card.appendChild(title);
+                card.appendChild(desc);
+                card.appendChild(price);
+                card.appendChild(btn);
+                container.appendChild(card);
+            });
+        }
+
+        function initPointShop() {
+            renderShopItems(pointShopItems, document.getElementById('shopPointsGrid'), 'points');
+            renderShopItems(dkkShopItems, document.getElementById('shopDkkGrid'), 'dkk');
+        }
+
+        function handleShopPurchase(item, mode) {
+            const stats = getUserStats();
+            if (mode === 'points') {
+                if (stats.points < item.price) {
+                    addNotification('Du har ikke nok point til dette køb.');
+                    return;
+                }
+                saveUserStats({ ...stats, points: stats.points - item.price });
+                addNotification(`Købte ${item.name} for ${item.price} point.`);
+                return;
+            }
+
+            awardPurchaseRewards(item.price, { name: item.name });
+        }
+
+        function switchShopTab(tab) {
+            const pointsGrid = document.getElementById('shopPointsGrid');
+            const dkkGrid = document.getElementById('shopDkkGrid');
+            const tabs = document.querySelectorAll('.shop-tab');
+            tabs.forEach(btn => btn.classList.remove('active'));
+            const activeBtn = document.querySelector(`.shop-tab[data-shop-tab="${tab}"]`);
+            if (activeBtn) activeBtn.classList.add('active');
+            if (tab === 'dkk') {
+                pointsGrid?.classList.add('hidden');
+                dkkGrid?.classList.remove('hidden');
+            } else {
+                pointsGrid?.classList.remove('hidden');
+                dkkGrid?.classList.add('hidden');
+            }
+        }
+
+        let currentChatContact = null;
+
+        function renderChatMessages(contactId) {
+            const container = document.getElementById('chatMessages');
+            if (!container) return;
+            container.innerHTML = '';
+            if (!contactId) {
+                const empty = document.createElement('div');
+                empty.className = 'friends-empty';
+                empty.textContent = 'Vælg en kontakt for at skrive.';
+                container.appendChild(empty);
+                return;
+            }
+            const raw = localStorage.getItem(getChatKey(contactId));
+            const messages = raw ? JSON.parse(raw) : [];
+            messages.forEach(msg => {
+                const bubble = document.createElement('div');
+                bubble.className = `chat-message ${msg.from === 'me' ? 'self' : 'other'}`;
+                bubble.textContent = msg.text;
+                container.appendChild(bubble);
+            });
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function saveChatMessage(contactId, message) {
+            const raw = localStorage.getItem(getChatKey(contactId));
+            const messages = raw ? JSON.parse(raw) : [];
+            messages.push(message);
+            localStorage.setItem(getChatKey(contactId), JSON.stringify(messages.slice(-100)));
+            renderChatMessages(contactId);
+        }
+
+        function selectChatContact(contactId) {
+            currentChatContact = contactId;
+            const contacts = document.querySelectorAll('.chat-contact');
+            contacts.forEach(el => el.classList.remove('active'));
+            const active = document.querySelector(`.chat-contact[data-contact-id="${contactId}"]`);
+            if (active) active.classList.add('active');
+            renderChatMessages(contactId);
+        }
+
+        async function loadChatContacts() {
+            const container = document.getElementById('chatContacts');
+            if (!container) return;
+            container.innerHTML = '';
+
+            const contacts = [{ id: 'assistant', name: 'Begivenheds vejleder', subtitle: 'AI assistent' }];
+            const current = getCurrentUser();
+            if (current && !current.isGuest) {
+                const friends = await getFriends(current.email);
+                const allUsers = await getAllUserProfiles();
+                friends.forEach(email => {
+                    const user = allUsers.find(u => u.email === email) || { name: email, email };
+                    contacts.push({ id: email, name: user.name || email, subtitle: user.email || email });
+                });
+            }
+
+            contacts.forEach(contact => {
+                const item = document.createElement('div');
+                item.className = 'chat-contact';
+                item.dataset.contactId = contact.id;
+
+                const meta = document.createElement('div');
+                meta.className = 'friend-meta';
+
+                const name = document.createElement('div');
+                name.className = 'friend-name';
+                name.textContent = contact.name;
+
+                const sub = document.createElement('div');
+                sub.className = 'friend-subtext';
+                sub.textContent = contact.subtitle;
+
+                meta.appendChild(name);
+                meta.appendChild(sub);
+                item.appendChild(meta);
+
+                item.addEventListener('click', () => selectChatContact(contact.id));
+                container.appendChild(item);
+            });
+
+            if (!currentChatContact && contacts.length > 0) {
+                selectChatContact(contacts[0].id);
+            }
+        }
+
+        function getAssistantReply(text) {
+            const lower = text.toLowerCase();
+            if (lower.includes('event') || lower.includes('begiven')) {
+                return 'Jeg kan hjælpe dig med at finde de bedste begivenheder. Prøv at gå til event-listen.';
+            }
+            if (lower.includes('point') || lower.includes('xp')) {
+                return 'Du tjener point og xp ved køb eller når du trykker deltager på en begivenhed.';
+            }
+            if (lower.includes('ven')) {
+                return 'Du kan tilføje venner via venne-siden og chatte her.';
+            }
+            return 'Jeg hjælper gerne. Spørg mig om events, point eller funktioner.';
+        }
+
+        function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            if (!input) return;
+            const text = input.value.trim();
+            if (!text || !currentChatContact) return;
+            input.value = '';
+
+            saveChatMessage(currentChatContact, { from: 'me', text, at: Date.now() });
+
+            if (currentChatContact === 'assistant') {
+                const reply = getAssistantReply(text);
+                setTimeout(() => {
+                    saveChatMessage(currentChatContact, { from: 'assistant', text: reply, at: Date.now() });
+                }, 600);
+            }
+        }
+
+        function formatPrice(price, currency = 'DKK') {
+            if (price == null) return '';
+            return new Intl.NumberFormat('da-DK', { style: 'currency', currency }).format(price);
         }
 
         // Avatar 3D variables
@@ -2767,7 +3388,23 @@
         }
 
         function openPointShop() {
-            alert('💎 Point Shop kommer snart! Her kan du købe nye avatar tilpasninger.');
+            document.getElementById('menu').classList.add('hidden');
+            document.getElementById('profilePage').classList.add('hidden');
+            document.getElementById('eventsPage').classList.add('hidden');
+            document.getElementById('settingsPage').classList.add('hidden');
+            document.getElementById('friendsPage').classList.add('hidden');
+            document.getElementById('allEventsPage').classList.add('hidden');
+            document.getElementById('notificationsPage').classList.add('hidden');
+            document.getElementById('chatPage').classList.add('hidden');
+            document.getElementById('pointShopPage').classList.remove('hidden');
+            updateStatsUI();
+            initPointShop();
+            switchShopTab('points');
+        }
+
+        function closePointShop() {
+            document.getElementById('pointShopPage').classList.add('hidden');
+            document.getElementById('menu').classList.remove('hidden');
         }
 
         function openEventsPage() {
@@ -2783,6 +3420,9 @@
             document.getElementById('allEventsPage').classList.add('hidden');
             document.getElementById('settingsPage').classList.add('hidden');
             document.getElementById('friendsPage').classList.add('hidden');
+            document.getElementById('pointShopPage').classList.add('hidden');
+            document.getElementById('notificationsPage').classList.add('hidden');
+            document.getElementById('chatPage').classList.add('hidden');
         }
 
         function openAllEventsPage() {
@@ -2852,6 +3492,42 @@
 
         function closeSettingsPage() {
             document.getElementById('settingsPage').classList.add('hidden');
+            document.getElementById('menu').classList.remove('hidden');
+        }
+
+        function openNotificationsPage() {
+            document.getElementById('menu').classList.add('hidden');
+            document.getElementById('profilePage').classList.add('hidden');
+            document.getElementById('eventsPage').classList.add('hidden');
+            document.getElementById('allEventsPage').classList.add('hidden');
+            document.getElementById('settingsPage').classList.add('hidden');
+            document.getElementById('friendsPage').classList.add('hidden');
+            document.getElementById('pointShopPage').classList.add('hidden');
+            document.getElementById('chatPage').classList.add('hidden');
+            document.getElementById('notificationsPage').classList.remove('hidden');
+            renderNotifications();
+        }
+
+        function closeNotificationsPage() {
+            document.getElementById('notificationsPage').classList.add('hidden');
+            document.getElementById('menu').classList.remove('hidden');
+        }
+
+        async function openChatPage() {
+            document.getElementById('menu').classList.add('hidden');
+            document.getElementById('profilePage').classList.add('hidden');
+            document.getElementById('eventsPage').classList.add('hidden');
+            document.getElementById('allEventsPage').classList.add('hidden');
+            document.getElementById('settingsPage').classList.add('hidden');
+            document.getElementById('friendsPage').classList.add('hidden');
+            document.getElementById('pointShopPage').classList.add('hidden');
+            document.getElementById('notificationsPage').classList.add('hidden');
+            document.getElementById('chatPage').classList.remove('hidden');
+            await loadChatContacts();
+        }
+
+        function closeChatPage() {
+            document.getElementById('chatPage').classList.add('hidden');
             document.getElementById('menu').classList.remove('hidden');
         }
 
@@ -3357,11 +4033,11 @@
 
         function getFallbackEvents() {
             return [
-                { name: 'Roskilde Festival', city: 'Roskilde', date: 'Dato TBA', url: '#' },
-                { name: 'Tinderbox', city: 'Odense', date: 'Dato TBA', url: '#' },
-                { name: 'NorthSide', city: 'Aarhus', date: 'Dato TBA', url: '#' },
-                { name: 'Smukfest', city: 'Skanderborg', date: 'Dato TBA', url: '#' },
-                { name: 'Copenhagen Jazz Festival', city: 'København', date: 'Dato TBA', url: '#' }
+                { name: 'Roskilde Festival', city: 'Roskilde', date: 'Dato TBA', url: '#', price: 899, currency: 'DKK' },
+                { name: 'Tinderbox', city: 'Odense', date: 'Dato TBA', url: '#', price: 799, currency: 'DKK' },
+                { name: 'NorthSide', city: 'Aarhus', date: 'Dato TBA', url: '#', price: 699, currency: 'DKK' },
+                { name: 'Smukfest', city: 'Skanderborg', date: 'Dato TBA', url: '#', price: 849, currency: 'DKK' },
+                { name: 'Copenhagen Jazz Festival', city: 'København', date: 'Dato TBA', url: '#', price: 399, currency: 'DKK' }
             ];
         }
 
@@ -3402,7 +4078,8 @@
                 link.textContent = event.name;
 
                 const meta = document.createElement('span');
-                meta.textContent = `${event.city} · ${event.date}`;
+                const priceText = event.price ? ` · ${formatPrice(event.price, event.currency)}` : '';
+                meta.textContent = `${event.city} · ${event.date}${priceText}`;
 
                 main.appendChild(link);
                 main.appendChild(meta);
@@ -3432,7 +4109,14 @@
                     attendBtn.textContent = 'Deltager';
                 }
                 attendBtn.addEventListener('click', async () => {
+                    const wasStored = isEventStored('attending', event);
                     await toggleEventStored('attending', event);
+                    if (!wasStored) {
+                        if (event.url) {
+                            window.open(event.url, '_blank', 'noopener');
+                        }
+                        awardPurchaseRewards(event.price, event);
+                    }
                     updateEventsUI(events);
                 });
 
@@ -3466,7 +4150,8 @@
                 link.textContent = event.name;
 
                 const meta = document.createElement('span');
-                meta.textContent = `${event.city} · ${event.date}`;
+                const priceText = event.price ? ` · ${formatPrice(event.price, event.currency)}` : '';
+                meta.textContent = `${event.city} · ${event.date}${priceText}`;
 
                 main.appendChild(link);
                 main.appendChild(meta);
@@ -3496,7 +4181,14 @@
                     attendBtn.textContent = 'Deltager';
                 }
                 attendBtn.addEventListener('click', async () => {
+                    const wasStored = isEventStored('attending', event);
                     await toggleEventStored('attending', event);
+                    if (!wasStored) {
+                        if (event.url) {
+                            window.open(event.url, '_blank', 'noopener');
+                        }
+                        awardPurchaseRewards(event.price, event);
+                    }
                     updateAllEventsUI(events);
                 });
 
@@ -3529,7 +4221,7 @@
                 const data = await response.json();
 
                 if (!response.ok) {
-                    updateEventsUI([]);
+                    updateEventsUI(getFallbackEvents());
                     return;
                 }
                 const items = data?._embedded?.events || [];
@@ -3538,24 +4230,28 @@
                     const city = item._embedded?.venues?.[0]?.city?.name || 'Danmark';
                     const rawDate = item.dates?.start?.dateTime || item.dates?.start?.localDate || '';
                     const date = formatEventDate(rawDate);
+                    const priceRange = item.priceRanges?.[0] || {};
+                    const price = typeof priceRange.min === 'number' ? priceRange.min : (typeof priceRange.max === 'number' ? priceRange.max : null);
                     return {
                         id: item.id,
                         name: item.name,
                         city,
                         date,
                         rawDate,
-                        url: item.url || '#'
+                        url: item.url || '#',
+                        price,
+                        currency: priceRange.currency || 'DKK'
                     };
                 });
 
                 if (events.length === 0) {
-                    updateEventsUI([]);
+                    updateEventsUI(getFallbackEvents());
                     return;
                 }
 
                 updateEventsUI(events);
             } catch (error) {
-                updateEventsUI([]);
+                updateEventsUI(getFallbackEvents());
             }
         }
 
@@ -3575,7 +4271,7 @@
                 const data = await response.json();
 
                 if (!response.ok) {
-                    updateAllEventsUI([]);
+                    updateAllEventsUI(getFallbackEvents());
                     return;
                 }
 
@@ -3584,13 +4280,17 @@
                     const city = item._embedded?.venues?.[0]?.city?.name || 'Danmark';
                     const rawDate = item.dates?.start?.dateTime || item.dates?.start?.localDate || '';
                     const date = formatEventDate(rawDate);
+                    const priceRange = item.priceRanges?.[0] || {};
+                    const price = typeof priceRange.min === 'number' ? priceRange.min : (typeof priceRange.max === 'number' ? priceRange.max : null);
                     return {
                         id: item.id,
                         name: item.name,
                         city,
                         date,
                         rawDate,
-                        url: item.url || '#'
+                        url: item.url || '#',
+                        price,
+                        currency: priceRange.currency || 'DKK'
                     };
                 });
 
@@ -3601,13 +4301,13 @@
                 });
 
                 if (events.length === 0) {
-                    updateAllEventsUI([]);
+                    updateAllEventsUI(getFallbackEvents());
                     return;
                 }
 
                 updateAllEventsUI(events);
             } catch (error) {
-                updateAllEventsUI([]);
+                updateAllEventsUI(getFallbackEvents());
             }
         }
 
@@ -3821,6 +4521,19 @@
                     }
                 });
             }
+
+            const chatInput = document.getElementById('chatInput');
+            if (chatInput) {
+                chatInput.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        sendChatMessage();
+                    }
+                });
+            }
+
+            initPointShop();
+            updateStatsUI();
+            renderNotifications();
         });
 
         window.addEventListener('resize', () => {
@@ -3935,6 +4648,9 @@
             document.getElementById('settingsPage').classList.add('hidden');
             document.getElementById('friendsPage').classList.add('hidden');
             document.getElementById('footerMenu').classList.remove('hidden');
+            document.getElementById('pointShopPage').classList.add('hidden');
+            document.getElementById('notificationsPage').classList.add('hidden');
+            document.getElementById('chatPage').classList.add('hidden');
             
             // Update avatar with user initials
             const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
@@ -3946,6 +4662,9 @@
             setTimeout(() => {
                 initAvatarPreview();
             }, 100);
+
+            updateStatsUI();
+            renderNotifications();
 
             await refreshStoredEvents();
             await loadEvents();
@@ -3970,9 +4689,13 @@
             document.getElementById('settingsPage').classList.add('hidden');
             document.getElementById('friendsPage').classList.add('hidden');
             document.getElementById('footerMenu').classList.add('hidden');
+            document.getElementById('pointShopPage').classList.add('hidden');
+            document.getElementById('notificationsPage').classList.add('hidden');
+            document.getElementById('chatPage').classList.add('hidden');
             document.getElementById('loginEmail').value = '';
             document.getElementById('loginPassword').value = '';
             clearErrors();
+            updateStatsUI({ xp: 0, level: 1, points: 0 });
         }
 
         async function checkLogin() {
