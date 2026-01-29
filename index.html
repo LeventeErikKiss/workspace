@@ -50,7 +50,10 @@
         #eventsPage,
         #allEventsPage,
         #settingsPage,
-        #friendsPage {
+        #friendsPage,
+        #pointShopPage,
+        #notificationsPage,
+        #chatPage {
             position: relative;
             z-index: 1;
         }
@@ -2243,54 +2246,6 @@
             </div>
         </div>
 
-        <!-- Point Shop Page -->
-        <div id="pointShopPage" class="hidden pointshop-page">
-            <div class="pointshop-header">
-                <button onclick="closePointShop()">← Tilbage</button>
-                <h2 style="flex: 1; text-align: center; margin: 0; color: white;">Point Shop</h2>
-                <div class="points-badge">🪙 <span id="shopPoints">0</span></div>
-            </div>
-
-            <div class="pointshop-tabs">
-                <button class="shop-tab active" data-shop-tab="points" onclick="switchShopTab('points')">Point items</button>
-                <button class="shop-tab" data-shop-tab="dkk" onclick="switchShopTab('dkk')">Køb for DKK</button>
-            </div>
-
-            <div class="pointshop-content">
-                <div id="shopPointsGrid" class="shop-grid"></div>
-                <div id="shopDkkGrid" class="shop-grid hidden"></div>
-            </div>
-        </div>
-
-        <!-- Notifications Page -->
-        <div id="notificationsPage" class="hidden notifications-page">
-            <div class="notifications-header">
-                <button onclick="closeNotificationsPage()">← Tilbage</button>
-                <h2 style="flex: 1; text-align: center; margin: 0; color: white;">Notifikationer</h2>
-            </div>
-            <div class="notifications-card">
-                <ul id="notificationsList" class="notifications-list"></ul>
-            </div>
-        </div>
-
-        <!-- Chat Page -->
-        <div id="chatPage" class="hidden chat-page">
-            <div class="chat-header">
-                <button onclick="closeChatPage()">← Tilbage</button>
-                <h2 style="flex: 1; text-align: center; margin: 0; color: white;">Beskeder</h2>
-            </div>
-            <div class="chat-body">
-                <div class="chat-sidebar" id="chatContacts"></div>
-                <div class="chat-panel">
-                    <div id="chatMessages" class="chat-messages"></div>
-                    <div class="chat-input">
-                        <input type="text" id="chatInput" placeholder="Skriv en besked...">
-                        <button type="button" onclick="sendChatMessage()">Send</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Old Dashboard (shown after login) -->
         <div id="dashboard" class="hidden dashboard">
             <h2>Velkommen!</h2>
@@ -2301,6 +2256,54 @@
             </div>
             <p style="color: #666; margin-bottom: 20px;">Du er nu logget ind og kan bruge alle funktioner på siden.</p>
             <button class="logout-button" onclick="handleLogout()">Log ud</button>
+        </div>
+    </div>
+
+    <!-- Point Shop Page -->
+    <div id="pointShopPage" class="hidden pointshop-page">
+        <div class="pointshop-header">
+            <button onclick="closePointShop()">← Tilbage</button>
+            <h2 style="flex: 1; text-align: center; margin: 0; color: white;">Point Shop</h2>
+            <div class="points-badge">🪙 <span id="shopPoints">0</span></div>
+        </div>
+
+        <div class="pointshop-tabs">
+            <button class="shop-tab active" data-shop-tab="points" onclick="switchShopTab('points')">Point items</button>
+            <button class="shop-tab" data-shop-tab="dkk" onclick="switchShopTab('dkk')">Køb for DKK</button>
+        </div>
+
+        <div class="pointshop-content">
+            <div id="shopPointsGrid" class="shop-grid"></div>
+            <div id="shopDkkGrid" class="shop-grid hidden"></div>
+        </div>
+    </div>
+
+    <!-- Notifications Page -->
+    <div id="notificationsPage" class="hidden notifications-page">
+        <div class="notifications-header">
+            <button onclick="closeNotificationsPage()">← Tilbage</button>
+            <h2 style="flex: 1; text-align: center; margin: 0; color: white;">Notifikationer</h2>
+        </div>
+        <div class="notifications-card">
+            <ul id="notificationsList" class="notifications-list"></ul>
+        </div>
+    </div>
+
+    <!-- Chat Page -->
+    <div id="chatPage" class="hidden chat-page">
+        <div class="chat-header">
+            <button onclick="closeChatPage()">← Tilbage</button>
+            <h2 style="flex: 1; text-align: center; margin: 0; color: white;">Beskeder</h2>
+        </div>
+        <div class="chat-body">
+            <div class="chat-sidebar" id="chatContacts"></div>
+            <div class="chat-panel">
+                <div id="chatMessages" class="chat-messages"></div>
+                <div class="chat-input">
+                    <input type="text" id="chatInput" placeholder="Skriv en besked...">
+                    <button type="button" onclick="sendChatMessage()">Send</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -4110,11 +4113,13 @@
                 }
                 attendBtn.addEventListener('click', async () => {
                     const wasStored = isEventStored('attending', event);
-                    await toggleEventStored('attending', event);
                     if (!wasStored) {
                         if (event.url) {
                             window.open(event.url, '_blank', 'noopener');
                         }
+                    }
+                    await toggleEventStored('attending', event);
+                    if (!wasStored) {
                         awardPurchaseRewards(event.price, event);
                     }
                     updateEventsUI(events);
@@ -4182,11 +4187,13 @@
                 }
                 attendBtn.addEventListener('click', async () => {
                     const wasStored = isEventStored('attending', event);
-                    await toggleEventStored('attending', event);
                     if (!wasStored) {
                         if (event.url) {
                             window.open(event.url, '_blank', 'noopener');
                         }
+                    }
+                    await toggleEventStored('attending', event);
+                    if (!wasStored) {
                         awardPurchaseRewards(event.price, event);
                     }
                     updateAllEventsUI(events);
