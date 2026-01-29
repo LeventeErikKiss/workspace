@@ -32,6 +32,10 @@ function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
 }
 
+function normalizeCpr(cpr) {
+  return String(cpr || '').trim();
+}
+
 async function upsertUser(email, name, password) {
   const existing = await get('SELECT email FROM users WHERE email = ?', [email]);
   if (existing) {
@@ -124,6 +128,54 @@ app.post('/api/users/register', async (req, res) => {
     res.json({ email, name });
   } catch (err) {
     res.status(500).json({ error: 'register failed' });
+  }
+});
+
+app.get('/api/mitid/:cpr', async (req, res) => {
+  try {
+    const cpr = normalizeCpr(req.params.cpr);
+    if (!cpr) return res.status(400).json({ error: 'cpr required' });
+
+    const mapping = await get('SELECT email FROM mitid_accounts WHERE cpr = ?', [cpr]);
+    if (!mapping) return res.status(404).json({ error: 'not found' });
+
+    const user = await get('SELECT email, name, createdAt FROM users WHERE email = ?', [mapping.email]);
+    if (!user) return res.status(404).json({ error: 'not found' });
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: 'mitid lookup failed' });
+  }
+});
+
+app.post('/api/mitid/register', async (req, res) => {
+  try {
+    const cpr = normalizeCpr(req.body?.cpr);
+    const name = String(req.body?.name || '').trim();
+    const email = normalizeEmail(req.body?.email);
+    if (!cpr || !name || !email) {
+      return res.status(400).json({ error: 'cpr, name, email required' });
+    }
+
+    const existingMap = await get('SELECT cpr FROM mitid_accounts WHERE cpr = ?', [cpr]);
+    if (existingMap) return res.status(409).json({ error: 'cpr exists' });
+
+    const existingUser = await get('SELECT email FROM users WHERE email = ?', [email]);
+    if (existingUser) {
+      await run('UPDATE users SET name = ? WHERE email = ?', [name, email]);
+    } else {
+      await run('INSERT INTO users (email, name, password, createdAt) VALUES (?, ?, ?, ?)', [
+        email,
+        name,
+        null,
+        nowIso()
+      ]);
+    }
+
+    await run('INSERT INTO mitid_accounts (cpr, email, createdAt) VALUES (?, ?, ?)', [cpr, email, nowIso()]);
+    const user = await get('SELECT email, name, createdAt FROM users WHERE email = ?', [email]);
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: 'mitid register failed' });
   }
 });
 

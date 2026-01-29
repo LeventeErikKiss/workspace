@@ -97,6 +97,15 @@ async function init() {
       updatedAt INTEGER NOT NULL
     )`
   );
+
+  await run(
+    `CREATE TABLE IF NOT EXISTS mitid_accounts (
+      cpr TEXT PRIMARY KEY,
+      email TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      FOREIGN KEY(email) REFERENCES users(email)
+    )`
+  );
 }
 
 module.exports = {

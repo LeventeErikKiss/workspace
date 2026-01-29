@@ -4597,9 +4597,8 @@
                 return;
             }
 
-            const pseudoEmail = `mitid_${cprNumber}@mitid.local`;
             try {
-                const user = await apiRequest(`/api/users/${encodeURIComponent(pseudoEmail)}`);
+                const user = await apiRequest(`/api/mitid/${encodeURIComponent(cprNumber)}`);
                 await loginUser(user.name, user.email, false, { skipServerLogin: true });
                 closeMitIDModal();
                 return;
@@ -4634,13 +4633,12 @@
                 return;
             }
 
-            const pseudoEmail = `mitid_${pendingMitidCpr}@mitid.local`;
             try {
-                await apiRequest('/api/users/login', {
+                const user = await apiRequest('/api/mitid/register', {
                     method: 'POST',
-                    body: JSON.stringify({ name, email: pseudoEmail })
+                    body: JSON.stringify({ name, email, cpr: pendingMitidCpr })
                 });
-                await loginUser(name, pseudoEmail, false, { skipServerLogin: true });
+                await loginUser(user.name, user.email, false, { skipServerLogin: true });
                 closeMitIDModal();
             } catch (err) {
                 if (errorEl) errorEl.innerHTML = '<p class="error-message">Kunne ikke oprette MitID bruger</p>';
