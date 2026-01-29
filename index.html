@@ -1828,14 +1828,37 @@
             overflow-y: auto;
         }
 
+        .chat-section-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #999;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+
         .chat-contact {
             display: flex;
             align-items: center;
-            justify-content: space-between;
+            gap: 10px;
             padding: 10px;
             border-radius: 8px;
             cursor: pointer;
             background-color: #f7f7f7;
+        }
+
+        .chat-contact .chat-avatar {
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 14px;
+            flex-shrink: 0;
         }
 
         .chat-contact.active {
@@ -1890,6 +1913,15 @@
             border-radius: 8px;
             border: 1px solid #ddd;
             font-size: 14px;
+            color: #1f2933;
+            background-color: #fff;
+        }
+
+        .chat-input button {
+            width: auto;
+            padding: 8px 12px;
+            font-size: 12px;
+            border-radius: 8px;
         }
 
         @media (max-width: 900px) {
@@ -2782,6 +2814,35 @@
 
         let currentChatContact = null;
 
+        function createChatContactItem(contact) {
+            const item = document.createElement('div');
+            item.className = 'chat-contact';
+            item.dataset.contactId = contact.id;
+
+            const avatar = document.createElement('div');
+            avatar.className = 'chat-avatar';
+            avatar.textContent = contact.initials || '🤖';
+
+            const meta = document.createElement('div');
+            meta.className = 'friend-meta';
+
+            const name = document.createElement('div');
+            name.className = 'friend-name';
+            name.textContent = contact.name;
+
+            const sub = document.createElement('div');
+            sub.className = 'friend-subtext';
+            sub.textContent = contact.subtitle;
+
+            meta.appendChild(name);
+            meta.appendChild(sub);
+
+            item.appendChild(avatar);
+            item.appendChild(meta);
+            item.addEventListener('click', () => selectChatContact(contact.id));
+            return item;
+        }
+
         function renderChatMessages(contactId) {
             const container = document.getElementById('chatMessages');
             if (!container) return;
@@ -2826,40 +2887,47 @@
             if (!container) return;
             container.innerHTML = '';
 
-            const contacts = [{ id: 'assistant', name: 'Begivenheds vejleder', subtitle: 'AI assistent' }];
+            const assistantContact = {
+                id: 'assistant',
+                name: 'Begivenheds vejleder',
+                subtitle: 'AI assistent',
+                initials: 'AI'
+            };
             const current = getCurrentUser();
+
+            const title = document.createElement('div');
+            title.className = 'chat-section-title';
+            title.textContent = 'Kontakter';
+            container.appendChild(title);
+
+            const aiLabel = document.createElement('div');
+            aiLabel.className = 'chat-section-title';
+            aiLabel.textContent = 'AI assistent';
+            container.appendChild(aiLabel);
+            container.appendChild(createChatContactItem(assistantContact));
+
+            const friendsLabel = document.createElement('div');
+            friendsLabel.className = 'chat-section-title';
+            friendsLabel.textContent = 'Venner';
+            container.appendChild(friendsLabel);
+
+            const contacts = [assistantContact];
             if (current && !current.isGuest) {
                 const friends = await getFriends(current.email);
                 const allUsers = await getAllUserProfiles();
                 friends.forEach(email => {
                     const user = allUsers.find(u => u.email === email) || { name: email, email };
-                    contacts.push({ id: email, name: user.name || email, subtitle: user.email || email });
+                    const initials = (user.name || email)
+                        .split(' ')
+                        .map(part => part[0])
+                        .join('')
+                        .substring(0, 2)
+                        .toUpperCase();
+                    const contact = { id: email, name: user.name || email, subtitle: user.email || email, initials };
+                    contacts.push(contact);
+                    container.appendChild(createChatContactItem(contact));
                 });
             }
-
-            contacts.forEach(contact => {
-                const item = document.createElement('div');
-                item.className = 'chat-contact';
-                item.dataset.contactId = contact.id;
-
-                const meta = document.createElement('div');
-                meta.className = 'friend-meta';
-
-                const name = document.createElement('div');
-                name.className = 'friend-name';
-                name.textContent = contact.name;
-
-                const sub = document.createElement('div');
-                sub.className = 'friend-subtext';
-                sub.textContent = contact.subtitle;
-
-                meta.appendChild(name);
-                meta.appendChild(sub);
-                item.appendChild(meta);
-
-                item.addEventListener('click', () => selectChatContact(contact.id));
-                container.appendChild(item);
-            });
 
             if (!currentChatContact && contacts.length > 0) {
                 selectChatContact(contacts[0].id);
@@ -4114,8 +4182,10 @@
                 attendBtn.addEventListener('click', async () => {
                     const wasStored = isEventStored('attending', event);
                     if (!wasStored) {
-                        if (event.url) {
-                            window.open(event.url, '_blank', 'noopener');
+                        if (event.url && event.url !== '#') {
+                            window.location.assign(event.url);
+                        } else {
+                            addNotification('Ticketmaster-link mangler for denne begivenhed.');
                         }
                     }
                     await toggleEventStored('attending', event);
@@ -4188,8 +4258,10 @@
                 attendBtn.addEventListener('click', async () => {
                     const wasStored = isEventStored('attending', event);
                     if (!wasStored) {
-                        if (event.url) {
-                            window.open(event.url, '_blank', 'noopener');
+                        if (event.url && event.url !== '#') {
+                            window.location.assign(event.url);
+                        } else {
+                            addNotification('Ticketmaster-link mangler for denne begivenhed.');
                         }
                     }
                     await toggleEventStored('attending', event);
