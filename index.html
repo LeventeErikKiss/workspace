@@ -2018,7 +2018,7 @@
                         <div class="avatar-circle" id="avatarInitials">👤</div>
                         <div class="avatar-info">
                             <p class="avatar-name" id="avatarName">Bruger</p>
-                            <p class="avatar-status">Logget ind</p>
+                            <p class="avatar-status" id="avatarStatus">Logget ind</p>
                         </div>
                     </div>
                     <div class="header-stats">
@@ -4821,6 +4821,10 @@
             const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
             document.getElementById('avatarInitials').textContent = initials;
             document.getElementById('avatarName').textContent = name;
+            const statusLabel = document.getElementById('avatarStatus');
+            if (statusLabel) {
+                statusLabel.textContent = isGuest ? 'Ikke logget ind' : 'Logget ind';
+            }
             
             // Load saved appearance and init preview
             await loadAvatarAppearance();
