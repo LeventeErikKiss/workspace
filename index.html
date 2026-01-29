@@ -1944,12 +1944,27 @@
         <div id="loginForm">
             <h3>Log ind på siden</h3>
             <p style="color: #666; margin-bottom: 30px;">Vælg hvordan du ønsker at logge ind</p>
+
+            <div class="form-group">
+                <label for="loginEmail">E-mail:</label>
+                <input type="email" id="loginEmail" placeholder="din@email.dk">
+            </div>
+            <div class="form-group">
+                <label for="loginPassword">Adgangskode:</label>
+                <input type="password" id="loginPassword" placeholder="Din adgangskode">
+            </div>
+            <div id="loginError"></div>
+            <button onclick="handleLogin()">Log ind</button>
             
             <button class="mitid-button" onclick="handleMitIDLogin()">🔐 Log ind med MitID</button>
             
             <div class="divider">eller</div>
             
             <button class="guest-button" onclick="handleGuestLogin()" style="width: 100%; padding: 12px;">👥 Log ind som gæst</button>
+
+            <div class="toggle-form">
+                Har du ikke en bruger? <a onclick="toggleForm()">Opret profil</a>
+            </div>
         </div>
 
         <!-- Register Form -->
@@ -2420,6 +2435,10 @@
             return 'https://event-storage-backend.onrender.com';
         })();
 
+        let guestStats = { xp: 0, level: 1, points: 0 };
+        let guestNotifications = [];
+        let guestChats = {};
+
         async function apiRequest(path, options = {}) {
             const response = await fetch(`${API_BASE}${path}`, {
                 headers: {
@@ -2610,19 +2629,30 @@
             return current.email || 'guest';
         }
 
+        function isGuestUser() {
+            const current = getCurrentUser();
+            return !current || current.isGuest;
+        }
+
         function getUserStatsKey() {
+            if (isGuestUser()) return null;
             return `userStats:${getUserKey()}`;
         }
 
         function getNotificationsKey() {
+            if (isGuestUser()) return null;
             return `notifications:${getUserKey()}`;
         }
 
         function getChatKey(contactId) {
+            if (isGuestUser()) return null;
             return `chat:${getUserKey()}:${contactId}`;
         }
 
         function getUserStats() {
+            if (isGuestUser()) {
+                return { ...guestStats };
+            }
             const raw = localStorage.getItem(getUserStatsKey());
             if (raw) {
                 try {
@@ -2635,6 +2665,11 @@
         }
 
         function saveUserStats(stats) {
+            if (isGuestUser()) {
+                guestStats = { ...stats };
+                updateStatsUI(guestStats);
+                return;
+            }
             localStorage.setItem(getUserStatsKey(), JSON.stringify(stats));
             updateStatsUI(stats);
         }
@@ -2698,6 +2733,12 @@
         }
 
         function addNotification(text) {
+            if (isGuestUser()) {
+                guestNotifications.unshift({ text, stamp: new Date().toLocaleString('da-DK', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }) });
+                guestNotifications = guestNotifications.slice(0, 50);
+                renderNotifications();
+                return;
+            }
             const list = getNotifications();
             const stamp = new Date().toLocaleString('da-DK', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' });
             list.unshift({ text, stamp });
@@ -2706,6 +2747,7 @@
         }
 
         function getNotifications() {
+            if (isGuestUser()) return [...guestNotifications];
             const raw = localStorage.getItem(getNotificationsKey());
             if (!raw) return [];
             try {
@@ -2782,6 +2824,10 @@
         }
 
         function handleShopPurchase(item, mode) {
+            if (isGuestUser()) {
+                addNotification('Gæsteprofil kan ikke gemme køb eller point.');
+                return;
+            }
             const stats = getUserStats();
             if (mode === 'points') {
                 if (stats.points < item.price) {
@@ -2792,8 +2838,7 @@
                 addNotification(`Købte ${item.name} for ${item.price} point.`);
                 return;
             }
-
-            awardPurchaseRewards(item.price, { name: item.name });
+            addNotification('DKK-køb afventer betaling. Point gives først når transaktionen er gennemført.');
         }
 
         function switchShopTab(tab) {
@@ -2854,8 +2899,13 @@
                 container.appendChild(empty);
                 return;
             }
-            const raw = localStorage.getItem(getChatKey(contactId));
-            const messages = raw ? JSON.parse(raw) : [];
+            let messages = [];
+            if (isGuestUser()) {
+                messages = guestChats[contactId] || [];
+            } else {
+                const raw = localStorage.getItem(getChatKey(contactId));
+                messages = raw ? JSON.parse(raw) : [];
+            }
             messages.forEach(msg => {
                 const bubble = document.createElement('div');
                 bubble.className = `chat-message ${msg.from === 'me' ? 'self' : 'other'}`;
@@ -2866,6 +2916,13 @@
         }
 
         function saveChatMessage(contactId, message) {
+            if (isGuestUser()) {
+                const messages = guestChats[contactId] || [];
+                messages.push(message);
+                guestChats[contactId] = messages.slice(-100);
+                renderChatMessages(contactId);
+                return;
+            }
             const raw = localStorage.getItem(getChatKey(contactId));
             const messages = raw ? JSON.parse(raw) : [];
             messages.push(message);
