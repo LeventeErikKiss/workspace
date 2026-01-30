@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Administrator</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body data-page="admin">
+    <video class="video-bg" autoplay muted loop playsinline>
+        <source src="../assets/ConcertVideo.mp4" type="video/mp4">
+    </video>
+
+    <div id="adminPage" class="admin-page">
+        <div class="admin-header">
+            <button type="button" onclick="goHome()">← Tilbage</button>
+            <h2>Administrator</h2>
+            <button type="button" id="adminLogoutBtn" class="admin-logout-btn hidden" onclick="handleAdminLogout()">Log ud</button>
+        </div>
+
+        <div id="adminLogin" class="admin-card">
+            <h3>Admin login</h3>
+            <div class="form-group">
+                <label for="adminEmail">E-mail</label>
+                <input type="email" id="adminEmail" placeholder="admin@example.com">
+            </div>
+            <div class="form-group">
+                <label for="adminPassword">Adgangskode</label>
+                <input type="password" id="adminPassword" placeholder="Adgangskode">
+            </div>
+            <div id="adminError" class="error-message"></div>
+            <button type="button" onclick="handleAdminLogin()">Log ind</button>
+        </div>
+
+        <div id="adminPanel" class="admin-panel hidden">
+            <div class="admin-card">
+                <h3>Opret bruger</h3>
+                <div class="form-group">
+                    <label for="adminCreateName">Navn</label>
+                    <input type="text" id="adminCreateName" placeholder="Fulde navn">
+                </div>
+                <div class="form-group">
+                    <label for="adminCreateEmail">E-mail</label>
+                    <input type="email" id="adminCreateEmail" placeholder="bruger@email.dk">
+                </div>
+                <div class="form-group">
+                    <label for="adminCreatePassword">Adgangskode (valgfri)</label>
+                    <input type="password" id="adminCreatePassword" placeholder="Adgangskode">
+                </div>
+                <div id="adminCreateError" class="error-message"></div>
+                <button type="button" onclick="handleAdminCreateUser()">Opret bruger</button>
+            </div>
+
+            <div class="admin-card">
+                <h3>Brugere</h3>
+                <ul id="adminUsersList" class="admin-users-list"></ul>
+            </div>
+        </div>
+    </div>
+
+    <script src="../app.js"></script>
+</body>
+</html>

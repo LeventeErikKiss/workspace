@@ -24,6 +24,7 @@ body {
     --shadow-strong: 0 16px 36px rgba(15, 23, 42, 0.18);
     --shadow-soft: 0 8px 20px rgba(15, 23, 42, 0.12);
     --border-soft: 1px solid rgba(15, 23, 42, 0.08);
+    --footer-offset: 90px;
 }
 
 .video-bg {
@@ -142,6 +143,15 @@ button:active {
 
 .guest-button:hover {
     background-color: #888;
+}
+
+.admin-button {
+    background-color: #1f2933;
+    margin-top: 12px;
+}
+
+.admin-button:hover {
+    background-color: #3b4a57;
 }
 
 .toggle-form {
@@ -304,9 +314,9 @@ h3 {
 
 .menu-content {
     padding: 60px 20px 20px;
-    padding-bottom: 90px;
+    padding-bottom: var(--footer-offset);
     background: linear-gradient(180deg, rgba(233, 75, 40, 0.55) 0%, rgba(43, 196, 169, 0.35) 100%);
-    min-height: calc(100vh - 100px);
+    min-height: calc(100vh - var(--footer-offset));
     backdrop-filter: blur(6px);
 }
 
@@ -890,8 +900,9 @@ h3 {
     flex-direction: column;
     gap: 20px;
     padding: 20px;
+    padding-bottom: var(--footer-offset);
     background-color: #f5f5f5;
-    min-height: calc(100vh - 100px);
+    min-height: calc(100vh - var(--footer-offset));
 }
 
 .events-page {
@@ -899,8 +910,113 @@ h3 {
     flex-direction: column;
     gap: 20px;
     padding: 20px;
+    padding-bottom: var(--footer-offset);
     background-color: #f5f5f5;
-    min-height: calc(100vh - 100px);
+    min-height: calc(100vh - var(--footer-offset));
+}
+
+.admin-page {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 20px;
+    background-color: #f5f5f5;
+    min-height: 100vh;
+}
+
+.admin-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    background-color: #E94B28;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    color: white;
+}
+
+.admin-header h2 {
+    flex: 1;
+    text-align: center;
+    margin: 0;
+}
+
+.admin-header button {
+    padding: 10px 20px;
+    background-color: rgba(255,255,255,0.3);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background-color 0.2s;
+    font-size: 14px;
+    width: auto;
+}
+
+.admin-header button:hover {
+    background-color: rgba(255,255,255,0.5);
+}
+
+.admin-card {
+    background-color: var(--surface);
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: var(--shadow-soft);
+    border: var(--border-soft);
+}
+
+.admin-panel {
+    display: grid;
+    gap: 20px;
+}
+
+.admin-users-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 12px;
+}
+
+.admin-user-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    background-color: rgba(255,255,255,0.9);
+    border-radius: 8px;
+    padding: 12px;
+    border: 1px solid rgba(15, 23, 42, 0.1);
+}
+
+.admin-user-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    color: #333;
+}
+
+.admin-user-info span {
+    font-size: 12px;
+    color: #666;
+}
+
+.admin-user-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.admin-delete-btn {
+    width: auto;
+    padding: 8px 14px;
+    background-color: #d9534f;
+    border-radius: 6px;
+    font-size: 13px;
+}
+
+.admin-delete-btn:hover {
+    background-color: #c9302c;
 }
 
 .friends-page {
@@ -908,9 +1024,9 @@ h3 {
     flex-direction: column;
     gap: 20px;
     padding: 20px;
-    padding-bottom: 90px;
+    padding-bottom: var(--footer-offset);
     background-color: #f5f5f5;
-    min-height: calc(100vh - 100px);
+    min-height: calc(100vh - var(--footer-offset));
     position: relative;
     z-index: 2;
 }
@@ -1109,9 +1225,9 @@ h3 {
     flex-direction: column;
     gap: 20px;
     padding: 20px;
-    padding-bottom: 90px;
+    padding-bottom: var(--footer-offset);
     background-color: #f5f5f5;
-    min-height: calc(100vh - 100px);
+    min-height: calc(100vh - var(--footer-offset));
 }
 
 .settings-header {
@@ -1682,9 +1798,9 @@ h3 {
     flex-direction: column;
     gap: 20px;
     padding: 20px;
-    padding-bottom: 90px;
+    padding-bottom: var(--footer-offset);
     background-color: #f5f5f5;
-    min-height: calc(100vh - 100px);
+    min-height: calc(100vh - var(--footer-offset));
 }
 
 .pointshop-header,

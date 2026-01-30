@@ -114,6 +114,39 @@ async function apiRequest(path, options = {}) {
     return response.json();
 }
 
+function getAdminAuth() {
+    const raw = sessionStorage.getItem('adminAuth');
+    if (!raw) return null;
+    try {
+        return JSON.parse(raw);
+    } catch (err) {
+        return null;
+    }
+}
+
+function setAdminAuth(auth) {
+    if (!auth) {
+        sessionStorage.removeItem('adminAuth');
+        return;
+    }
+    sessionStorage.setItem('adminAuth', JSON.stringify(auth));
+}
+
+async function adminRequest(path, options = {}) {
+    const auth = getAdminAuth();
+    if (!auth) {
+        throw new Error('admin auth missing');
+    }
+    return apiRequest(path, {
+        ...options,
+        headers: {
+            ...(options.headers || {}),
+            'X-Admin-Email': auth.email,
+            'X-Admin-Password': auth.password
+        }
+    });
+}
+
 function buildTicketmasterUrl(params) {
     const query = new URLSearchParams({
         apikey: TICKETMASTER_API_KEY,
@@ -1192,6 +1225,10 @@ function goHome() {
     navigateTo('/');
 }
 
+function openAdminPage() {
+    navigateTo('/admin/');
+}
+
 function openAllEventsPage() {
     navigateTo('/all-events/');
 }
@@ -1234,6 +1271,164 @@ function closeNotificationsPage() {
 
 async function openChatPage() {
     navigateTo('/chat/');
+}
+
+function showAdminPanel(isAuthed) {
+    setHidden('adminLogin', isAuthed);
+    setHidden('adminPanel', !isAuthed);
+    setHidden('adminLogoutBtn', !isAuthed);
+}
+
+function showAdminError(message = '') {
+    const el = document.getElementById('adminError');
+    if (el) {
+        el.textContent = message;
+    }
+}
+
+function showAdminCreateError(message = '') {
+    const el = document.getElementById('adminCreateError');
+    if (el) {
+        el.textContent = message;
+    }
+}
+
+function formatAdminDate(value) {
+    if (!value) return 'Ukendt';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return 'Ukendt';
+    return parsed.toLocaleDateString('da-DK', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+async function handleAdminLogin() {
+    const emailInput = document.getElementById('adminEmail');
+    const passwordInput = document.getElementById('adminPassword');
+    if (!emailInput || !passwordInput) return;
+
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+    showAdminError('');
+
+    if (!email || !password) {
+        showAdminError('Udfyld både e-mail og adgangskode.');
+        return;
+    }
+
+    try {
+        await apiRequest('/api/admin/login', {
+            method: 'POST',
+            body: JSON.stringify({ email, password })
+        });
+        setAdminAuth({ email, password });
+        showAdminPanel(true);
+        await loadAdminUsers();
+    } catch (err) {
+        showAdminError('Forkert admin-login.');
+    }
+}
+
+function handleAdminLogout() {
+    setAdminAuth(null);
+    showAdminPanel(false);
+}
+
+async function handleAdminCreateUser() {
+    const nameInput = document.getElementById('adminCreateName');
+    const emailInput = document.getElementById('adminCreateEmail');
+    const passwordInput = document.getElementById('adminCreatePassword');
+    if (!nameInput || !emailInput || !passwordInput) return;
+
+    const name = nameInput.value.trim();
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+    showAdminCreateError('');
+
+    if (!name || !email) {
+        showAdminCreateError('Navn og e-mail er påkrævet.');
+        return;
+    }
+
+    try {
+        await adminRequest('/api/admin/users', {
+            method: 'POST',
+            body: JSON.stringify({ name, email, password })
+        });
+        nameInput.value = '';
+        emailInput.value = '';
+        passwordInput.value = '';
+        await loadAdminUsers();
+    } catch (err) {
+        showAdminCreateError('Kunne ikke oprette bruger. Tjek om e-mail allerede findes.');
+    }
+}
+
+async function handleAdminDeleteUser(email) {
+    if (!email) return;
+    const ok = confirm(`Slet brugeren ${email}?`);
+    if (!ok) return;
+    try {
+        await adminRequest(`/api/admin/users/${encodeURIComponent(email)}`, {
+            method: 'DELETE'
+        });
+        await loadAdminUsers();
+    } catch (err) {
+        showAdminCreateError('Kunne ikke slette brugeren.');
+    }
+}
+
+async function loadAdminUsers() {
+    const list = document.getElementById('adminUsersList');
+    if (!list) return;
+    list.innerHTML = '';
+
+    try {
+        const users = await adminRequest('/api/admin/users');
+        if (!Array.isArray(users) || users.length === 0) {
+            const li = document.createElement('li');
+            li.textContent = 'Ingen brugere endnu.';
+            list.appendChild(li);
+            return;
+        }
+
+        users.forEach(user => {
+            const li = document.createElement('li');
+            li.className = 'admin-user-row';
+
+            const info = document.createElement('div');
+            info.className = 'admin-user-info';
+            info.innerHTML = `
+                <strong>${user.name || 'Ukendt'}</strong>
+                <span>${user.email || ''}</span>
+                <span>Oprettet: ${formatAdminDate(user.createdAt)}</span>
+            `;
+
+            const actions = document.createElement('div');
+            actions.className = 'admin-user-actions';
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.type = 'button';
+            deleteBtn.className = 'admin-delete-btn';
+            deleteBtn.textContent = 'Slet';
+            deleteBtn.addEventListener('click', () => handleAdminDeleteUser(user.email));
+
+            actions.appendChild(deleteBtn);
+            li.appendChild(info);
+            li.appendChild(actions);
+            list.appendChild(li);
+        });
+    } catch (err) {
+        const li = document.createElement('li');
+        li.textContent = 'Kunne ikke hente brugere.';
+        list.appendChild(li);
+    }
+}
+
+function initAdminPage() {
+    const auth = getAdminAuth();
+    showAdminPanel(Boolean(auth));
+    if (auth) {
+        loadAdminUsers();
+    }
 }
 
 function closeChatPage() {
@@ -1759,93 +1954,96 @@ function updateEventsUI(events, options = {}) {
     const top3 = document.getElementById('eventsTop3');
     const list = document.getElementById('eventsList');
 
-    if (!top3 || !list) return;
+    if (!top3 && !list) return;
 
-    top3.innerHTML = '';
-    list.innerHTML = '';
-
-    const topThree = events.slice(0, 3);
-    const medals = ['🥇', '🥈', '🥉'];
-    topThree.forEach((event, index) => {
-        const li = document.createElement('li');
-        const medal = medals[index] || '🏅';
-        li.innerHTML = `
-            <span class="rank">${medal} ${index + 1}.</span>
-            <span class="event-title">${event.name}</span>
-            <span class="event-city">${event.city}</span>
-        `;
-        top3.appendChild(li);
-    });
-
-    events.slice(0, 50).forEach(event => {
-        const li = document.createElement('li');
-        const row = document.createElement('div');
-        row.className = 'event-row';
-
-        const main = document.createElement('div');
-        main.className = 'event-main';
-
-        const link = document.createElement('a');
-        link.href = event.url;
-        link.target = '_blank';
-        link.rel = 'noopener';
-        link.textContent = event.name;
-
-        const meta = document.createElement('span');
-        const priceText = event.price ? ` · ${formatPrice(event.price, event.currency)}` : '';
-        meta.textContent = `${event.city} · ${event.date}${priceText}`;
-
-        main.appendChild(link);
-        main.appendChild(meta);
-
-        const actions = document.createElement('div');
-        actions.className = 'event-actions';
-
-        const interestedBtn = document.createElement('button');
-        interestedBtn.className = 'event-action-btn event-action-interested';
-        if (isEventStored('interested', event)) {
-            interestedBtn.classList.add('active');
-            interestedBtn.textContent = 'Interesseret ✔';
-        } else {
-            interestedBtn.textContent = 'Interesseret';
-        }
-        interestedBtn.addEventListener('click', async () => {
-            await toggleEventStored('interested', event);
-            updateEventsUI(events);
+    if (top3) {
+        top3.innerHTML = '';
+        const topThree = events.slice(0, 3);
+        const medals = ['🥇', '🥈', '🥉'];
+        topThree.forEach((event, index) => {
+            const li = document.createElement('li');
+            const medal = medals[index] || '🏅';
+            li.innerHTML = `
+                <span class="rank">${medal} ${index + 1}.</span>
+                <span class="event-title">${event.name}</span>
+                <span class="event-city">${event.city}</span>
+            `;
+            top3.appendChild(li);
         });
+    }
 
-        const attendBtn = document.createElement('button');
-        attendBtn.className = 'event-action-btn event-action-attend';
-        if (isEventStored('attending', event)) {
-            attendBtn.classList.add('active');
-            attendBtn.textContent = 'Deltager ✔';
-        } else {
-            attendBtn.textContent = 'Deltager';
-        }
-        attendBtn.addEventListener('click', async () => {
-            const wasStored = isEventStored('attending', event);
-            if (!wasStored) {
-                if (event.url && event.url !== '#') {
-                    window.location.assign(event.url);
-                } else {
-                    addNotification('Ticketmaster-link mangler for denne begivenhed.');
+    if (list) {
+        list.innerHTML = '';
+        events.slice(0, 50).forEach(event => {
+            const li = document.createElement('li');
+            const row = document.createElement('div');
+            row.className = 'event-row';
+
+            const main = document.createElement('div');
+            main.className = 'event-main';
+
+            const link = document.createElement('a');
+            link.href = event.url;
+            link.target = '_blank';
+            link.rel = 'noopener';
+            link.textContent = event.name;
+
+            const meta = document.createElement('span');
+            const priceText = event.price ? ` · ${formatPrice(event.price, event.currency)}` : '';
+            meta.textContent = `${event.city} · ${event.date}${priceText}`;
+
+            main.appendChild(link);
+            main.appendChild(meta);
+
+            const actions = document.createElement('div');
+            actions.className = 'event-actions';
+
+            const interestedBtn = document.createElement('button');
+            interestedBtn.className = 'event-action-btn event-action-interested';
+            if (isEventStored('interested', event)) {
+                interestedBtn.classList.add('active');
+                interestedBtn.textContent = 'Interesseret ✔';
+            } else {
+                interestedBtn.textContent = 'Interesseret';
+            }
+            interestedBtn.addEventListener('click', async () => {
+                await toggleEventStored('interested', event);
+                updateEventsUI(events);
+            });
+
+            const attendBtn = document.createElement('button');
+            attendBtn.className = 'event-action-btn event-action-attend';
+            if (isEventStored('attending', event)) {
+                attendBtn.classList.add('active');
+                attendBtn.textContent = 'Deltager ✔';
+            } else {
+                attendBtn.textContent = 'Deltager';
+            }
+            attendBtn.addEventListener('click', async () => {
+                const wasStored = isEventStored('attending', event);
+                if (!wasStored) {
+                    if (event.url && event.url !== '#') {
+                        window.location.assign(event.url);
+                    } else {
+                        addNotification('Ticketmaster-link mangler for denne begivenhed.');
+                    }
                 }
-            }
-            await toggleEventStored('attending', event);
-            if (!wasStored) {
-                awardPurchaseRewards(event.price, event);
-            }
-            updateEventsUI(events);
+                await toggleEventStored('attending', event);
+                if (!wasStored) {
+                    awardPurchaseRewards(event.price, event);
+                }
+                updateEventsUI(events);
+            });
+
+            actions.appendChild(interestedBtn);
+            actions.appendChild(attendBtn);
+
+            row.appendChild(main);
+            row.appendChild(actions);
+            li.appendChild(row);
+            list.appendChild(li);
         });
-
-        actions.appendChild(interestedBtn);
-        actions.appendChild(attendBtn);
-
-        row.appendChild(main);
-        row.appendChild(actions);
-        li.appendChild(row);
-        list.appendChild(li);
-    });
+    }
 }
 
 function updateAllEventsUI(events) {
@@ -2439,8 +2637,13 @@ function handleLogout() {
 
 async function checkLogin() {
     const currentUser = sessionStorage.getItem('currentUser');
+    const currentPage = getCurrentPage();
+    if (currentPage === 'admin') {
+        initAdminPage();
+        return;
+    }
     if (!currentUser) {
-        if (getCurrentPage() !== 'home') {
+        if (currentPage !== 'home') {
             navigateTo('/');
         }
         return;

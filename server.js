@@ -5,6 +5,9 @@ const { init, run, get, all } = require('./db');
 
 const app = express();
 
+const ADMIN_EMAIL = normalizeEmail(process.env.ADMIN_EMAIL || 'aproati555@gmail.com');
+const ADMIN_PASSWORD = String(process.env.ADMIN_PASSWORD || '123456-1234');
+
 const corsOrigin = process.env.CORS_ORIGIN || '';
 const allowedOrigins = corsOrigin
   .split(',')
@@ -34,6 +37,24 @@ function normalizeEmail(email) {
 
 function normalizeCpr(cpr) {
   return String(cpr || '').trim();
+}
+
+function getAdminCredentials(req) {
+  const email = normalizeEmail(req.headers['x-admin-email'] || req.body?.email || req.query?.email);
+  const password = String(req.headers['x-admin-password'] || req.body?.password || req.query?.password || '');
+  return { email, password };
+}
+
+function isAdmin(req) {
+  const { email, password } = getAdminCredentials(req);
+  return Boolean(email && password && email === ADMIN_EMAIL && password === ADMIN_PASSWORD);
+}
+
+function requireAdmin(req, res, next) {
+  if (!isAdmin(req)) {
+    return res.status(401).json({ error: 'admin unauthorized' });
+  }
+  next();
 }
 
 async function upsertUser(email, name, password) {
@@ -103,6 +124,65 @@ app.post('/api/users/login', async (req, res) => {
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: 'login failed' });
+  }
+});
+
+app.post('/api/admin/login', (req, res) => {
+  if (!isAdmin(req)) {
+    return res.status(401).json({ error: 'invalid admin credentials' });
+  }
+  res.json({ email: ADMIN_EMAIL });
+});
+
+app.get('/api/admin/users', requireAdmin, async (req, res) => {
+  try {
+    const rows = await all('SELECT email, name, createdAt FROM users ORDER BY createdAt DESC');
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'admin users read failed' });
+  }
+});
+
+app.post('/api/admin/users', requireAdmin, async (req, res) => {
+  try {
+    const name = String(req.body?.name || '').trim();
+    const email = normalizeEmail(req.body?.email);
+    const password = String(req.body?.password || '');
+    if (!name || !email) {
+      return res.status(400).json({ error: 'name and email required' });
+    }
+
+    const existing = await get('SELECT email FROM users WHERE email = ?', [email]);
+    if (existing) return res.status(409).json({ error: 'email exists' });
+
+    const hashed = password ? await bcrypt.hash(password, 10) : null;
+    await run('INSERT INTO users (email, name, password, createdAt) VALUES (?, ?, ?, ?)', [
+      email,
+      name,
+      hashed,
+      nowIso()
+    ]);
+    res.json({ email, name });
+  } catch (err) {
+    res.status(500).json({ error: 'admin user create failed' });
+  }
+});
+
+app.delete('/api/admin/users/:email', requireAdmin, async (req, res) => {
+  try {
+    const email = normalizeEmail(req.params.email);
+    await run('BEGIN TRANSACTION');
+    await run('DELETE FROM avatars WHERE email = ?', [email]);
+    await run('DELETE FROM friends WHERE email = ? OR friendEmail = ?', [email, email]);
+    await run('DELETE FROM requests WHERE email = ? OR fromEmail = ?', [email, email]);
+    await run('DELETE FROM events WHERE email = ?', [email]);
+    await run('DELETE FROM locations WHERE email = ?', [email]);
+    await run('DELETE FROM users WHERE email = ?', [email]);
+    await run('COMMIT');
+    res.json({ ok: true });
+  } catch (err) {
+    await run('ROLLBACK').catch(() => null);
+    res.status(500).json({ error: 'admin user delete failed' });
   }
 });
 
