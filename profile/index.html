@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avatar Designer</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body data-page="profile">
+    <video class="video-bg" autoplay muted loop playsinline>
+        <source src="../assets/ConcertVideo.mp4" type="video/mp4">
+    </video>
+
+    <div id="profilePage" class="profile-page">
+        <div class="profile-header">
+            <button onclick="backToDashboard()">← Tilbage</button>
+            <h2 style="flex: 1; text-align: center; margin: 0; color: white;">🎨 Avatar Designer</h2>
+        </div>
+        <div class="avatar-editor-container">
+            <h2>Kustomiser din avatar</h2>
+            <div style="height: 20px;"></div>
+            <div class="avatar-editor-content">
+                <div class="avatar-canvas-wrapper">
+                    <canvas id="avatarCanvas"></canvas>
+                </div>
+                <div class="avatar-controls-wrapper">
+                    <div class="avatar-controls">
+                        <div class="control-group">
+                            <div class="control-group-title">Kroptype</div>
+                            <div class="select-control">
+                                <select id="bodyType" onchange="updateAvatarBody()">
+                                    <option value="slim">Slank</option>
+                                    <option value="normal" selected>Normal</option>
+                                    <option value="athletic">Atletisk</option>
+                                    <option value="large">Stor</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-group-title">Hoved</div>
+                            <div class="select-control">
+                                <select id="headShape" onchange="updateAvatarHead()">
+                                    <option value="box" selected>Blok</option>
+                                    <option value="sphere">Kugle</option>
+                                    <option value="oval">Oval</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-group-title">Ansigt</div>
+                            <div class="color-control">
+                                <label>Hudsfarve:</label>
+                                <input type="color" id="headColor" value="#FDBCB4" onchange="updateAvatarColors()">
+                            </div>
+                            <div class="color-control">
+                                <label>Hårfarve:</label>
+                                <input type="color" id="hairColor" value="#8B4513" onchange="updateAvatarColors()">
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-group-title">Tøj</div>
+                            <div class="color-control">
+                                <label>Trøje:</label>
+                                <input type="color" id="bodyColor" value="#4169E1" onchange="updateAvatarColors()">
+                            </div>
+                            <div class="color-control">
+                                <label>Bukser:</label>
+                                <input type="color" id="pantsColor" value="#333333" onchange="updateAvatarColors()">
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-group-title">Sko</div>
+                            <div class="color-control">
+                                <label>Skofarve:</label>
+                                <input type="color" id="shoesColor" value="#000000" onchange="updateAvatarColors()">
+                            </div>
+                        </div>
+
+                        <div class="control-group">
+                            <div class="control-group-title">Udtryk</div>
+                            <div class="select-control">
+                                <select id="expression" onchange="updateAvatarExpression()">
+                                    <option value="happy" selected>Glad 😊</option>
+                                    <option value="neutral">Neutral 😐</option>
+                                    <option value="cool">Cool 😎</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="avatar-buttons">
+                            <button onclick="resetAvatar()">🔄 Nulstil</button>
+                            <button onclick="saveAvatarAppearance()">💾 Gem</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="footerMenu" class="footer-menu">
+        <button type="button" id="footerFriendsBtn" aria-label="Venner" title="Venner" onclick="openFriendsPage()">👥</button>
+        <button type="button" aria-label="Point Shop" title="Point Shop" onclick="openPointShop()">💎</button>
+        <button type="button" class="footer-home" aria-label="Home" title="Home" onclick="goHome()">🏠</button>
+        <button type="button" aria-label="Notifications" title="Notifications" onclick="openNotificationsPage()">🔔</button>
+        <button type="button" aria-label="Privat beskeder" title="Privat beskeder" onclick="openChatPage()">💬</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="../app.js"></script>
+</body>
+</html>

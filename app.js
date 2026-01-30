@@ -1,0 +1,2518 @@
+const TICKETMASTER_API_URL = 'https://app.ticketmaster.com/discovery/v2/events.json';
+const TICKETMASTER_API_KEY = 'yMmAApLiWUsGAdwYLY5OyV33NUykHAtb';
+const API_BASE = (() => {
+    if (window.API_BASE) return window.API_BASE;
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+        return 'http://localhost:3002';
+    }
+    return 'https://event-storage-backend.onrender.com';
+})();
+
+let guestStats = { xp: 0, level: 1, points: 0 };
+let guestNotifications = [];
+let guestChats = {};
+
+function getCurrentPage() {
+    return document.body?.dataset?.page || 'home';
+}
+
+function navigateTo(path) {
+    window.location.href = path;
+}
+
+function setHidden(id, hidden) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.toggle('hidden', hidden);
+}
+
+function setText(id, value) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = value;
+}
+
+function updateUserUI(user) {
+    if (!user) return;
+    const { name, email, isGuest } = user;
+    const initials = (name || '')
+        .split(' ')
+        .map(part => part[0])
+        .join('')
+        .toUpperCase()
+        .substring(0, 2);
+
+    setText('avatarInitials', initials || '👤');
+    setText('avatarName', name || 'Bruger');
+    setText('displayUserName', name || 'Bruger');
+    setText('displayUserEmail', email || '');
+
+    const statusLabel = document.getElementById('avatarStatus');
+    if (statusLabel) {
+        statusLabel.textContent = isGuest ? 'Ikke logget ind' : 'Logget ind';
+    }
+
+    const friendsBtn = document.getElementById('footerFriendsBtn');
+    if (friendsBtn) {
+        friendsBtn.classList.toggle('hidden', isGuest);
+    }
+
+    const headerStats = document.querySelector('.header-stats');
+    if (headerStats) {
+        headerStats.classList.toggle('hidden', isGuest);
+    }
+}
+
+function prepareSettingsPage(user) {
+    const nameInput = document.getElementById('settingsName');
+    const emailInput = document.getElementById('settingsEmail');
+    const deleteBtn = document.getElementById('deleteAccountBtn');
+    if (!nameInput || !emailInput) return;
+
+    nameInput.removeAttribute('readonly');
+    nameInput.removeAttribute('disabled');
+    emailInput.removeAttribute('readonly');
+    emailInput.removeAttribute('disabled');
+
+    if (user) {
+        nameInput.value = user.name || '';
+        emailInput.value = user.email || '';
+
+        if (user.isGuest) {
+            nameInput.setAttribute('readonly', 'true');
+            nameInput.setAttribute('disabled', 'true');
+            emailInput.setAttribute('readonly', 'true');
+            emailInput.setAttribute('disabled', 'true');
+            deleteBtn?.classList.add('hidden');
+        } else {
+            deleteBtn?.classList.remove('hidden');
+        }
+    }
+
+    nameInput.focus();
+    nameInput.select?.();
+}
+
+async function apiRequest(path, options = {}) {
+    const response = await fetch(`${API_BASE}${path}`, {
+        headers: {
+            'Content-Type': 'application/json',
+            ...(options.headers || {})
+        },
+        ...options
+    });
+
+    if (!response.ok) {
+        throw new Error('API request failed');
+    }
+
+    if (response.status === 204) {
+        return null;
+    }
+
+    return response.json();
+}
+
+function buildTicketmasterUrl(params) {
+    const query = new URLSearchParams({
+        apikey: TICKETMASTER_API_KEY,
+        ...params
+    });
+    return `${TICKETMASTER_API_URL}?${query.toString()}`;
+}
+
+let storedInterested = [];
+let storedAttending = [];
+let storedInterestedSet = new Set();
+let storedAttendingSet = new Set();
+
+function getEventKey(event) {
+    return event.eventId || event.id || `${event.name || ''}__${event.rawDate || ''}__${event.city || ''}`;
+}
+
+function getEventId(event) {
+    return event.eventId || event.id || getEventKey(event);
+}
+
+function normalizeEventForStorage(event) {
+    return {
+        eventId: getEventId(event),
+        name: event.name || 'Begivenhed',
+        city: event.city || '',
+        date: event.date || '',
+        rawDate: event.rawDate || '',
+        url: event.url || '',
+        price: typeof event.price === 'number' ? event.price : null,
+        currency: event.currency || 'DKK'
+    };
+}
+
+async function refreshStoredEvents() {
+    const current = getCurrentUser();
+    if (!current || current.isGuest) {
+        storedInterested = [];
+        storedAttending = [];
+        storedInterestedSet = new Set();
+        storedAttendingSet = new Set();
+        renderInterestedFolder();
+        return;
+    }
+
+    const email = encodeURIComponent(current.email);
+    const [interested, attending] = await Promise.all([
+        apiRequest(`/api/events/${email}?type=interested`),
+        apiRequest(`/api/events/${email}?type=attending`)
+    ]);
+
+    storedInterested = interested || [];
+    storedAttending = attending || [];
+    storedInterestedSet = new Set(storedInterested.map(item => item.eventId));
+    storedAttendingSet = new Set(storedAttending.map(item => item.eventId));
+    renderInterestedFolder();
+}
+
+function isEventStored(type, event) {
+    const eventId = getEventId(event);
+    return type === 'interested'
+        ? storedInterestedSet.has(eventId)
+        : storedAttendingSet.has(eventId);
+}
+
+async function toggleEventStored(type, event) {
+    const current = getCurrentUser();
+    if (!current || current.isGuest) return;
+
+    const email = encodeURIComponent(current.email);
+    const eventId = getEventId(event);
+    const exists = isEventStored(type, event);
+
+    if (exists) {
+        await apiRequest(`/api/events/${email}?type=${encodeURIComponent(type)}&eventId=${encodeURIComponent(eventId)}`, {
+            method: 'DELETE'
+        });
+
+        if (type === 'interested') {
+            storedInterested = storedInterested.filter(item => item.eventId !== eventId);
+            storedInterestedSet.delete(eventId);
+        } else {
+            storedAttending = storedAttending.filter(item => item.eventId !== eventId);
+            storedAttendingSet.delete(eventId);
+        }
+    } else {
+        const payload = normalizeEventForStorage(event);
+        await apiRequest(`/api/events/${email}`, {
+            method: 'POST',
+            body: JSON.stringify({ type, event: payload })
+        });
+
+        if (type === 'interested') {
+            storedInterested = [...storedInterested, payload];
+            storedInterestedSet.add(eventId);
+        } else {
+            storedAttending = [...storedAttending, payload];
+            storedAttendingSet.add(eventId);
+        }
+    }
+
+    renderInterestedFolder();
+}
+
+function toggleInterestedFolder() {
+    const panel = document.getElementById('interestedFolder');
+    if (!panel) return;
+    panel.classList.toggle('hidden');
+    if (!panel.classList.contains('hidden')) {
+        renderInterestedFolder();
+    }
+}
+
+function renderInterestedFolder() {
+    const list = document.getElementById('interestedFolderList');
+    if (!list) return;
+    list.innerHTML = '';
+    const events = storedInterested;
+    if (events.length === 0) {
+        const empty = document.createElement('li');
+        empty.textContent = 'Ingen interesserede begivenheder endnu.';
+        list.appendChild(empty);
+        return;
+    }
+
+    events.forEach(event => {
+        const li = document.createElement('li');
+        const row = document.createElement('div');
+        row.className = 'event-row';
+
+        const main = document.createElement('div');
+        main.className = 'event-main';
+
+        const link = document.createElement('a');
+        link.href = event.url || '#';
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.textContent = event.name || 'Begivenhed';
+
+        const meta = document.createElement('span');
+        const priceText = event.price ? ` · ${formatPrice(event.price, event.currency)}` : '';
+        meta.textContent = `${event.city || 'Danmark'} · ${event.date || 'Dato TBA'}${priceText}`;
+
+        main.appendChild(link);
+        main.appendChild(meta);
+
+        const actions = document.createElement('div');
+        actions.className = 'event-actions';
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'event-action-btn event-action-interested active';
+        removeBtn.textContent = 'Fjern interesse';
+        removeBtn.addEventListener('click', () => {
+            toggleEventStored('interested', event);
+        });
+
+        actions.appendChild(removeBtn);
+        row.appendChild(main);
+        row.appendChild(actions);
+        li.appendChild(row);
+        list.appendChild(li);
+    });
+}
+
+function getUserKey() {
+    const current = getCurrentUser();
+    if (!current) return 'guest';
+    return current.email || 'guest';
+}
+
+function isGuestUser() {
+    const current = getCurrentUser();
+    return !current || current.isGuest;
+}
+
+function getUserStatsKey() {
+    if (isGuestUser()) return null;
+    return `userStats:${getUserKey()}`;
+}
+
+function getNotificationsKey() {
+    if (isGuestUser()) return null;
+    return `notifications:${getUserKey()}`;
+}
+
+function getChatKey(contactId) {
+    if (isGuestUser()) return null;
+    return `chat:${getUserKey()}:${contactId}`;
+}
+
+function getUserStats() {
+    if (isGuestUser()) {
+        return { ...guestStats };
+    }
+    const raw = localStorage.getItem(getUserStatsKey());
+    if (raw) {
+        try {
+            return JSON.parse(raw);
+        } catch (e) {
+            // ignore parse issues
+        }
+    }
+    return { xp: 0, level: 1, points: 0 };
+}
+
+function saveUserStats(stats) {
+    if (isGuestUser()) {
+        guestStats = { ...stats };
+        updateStatsUI(guestStats);
+        return;
+    }
+    localStorage.setItem(getUserStatsKey(), JSON.stringify(stats));
+    updateStatsUI(stats);
+}
+
+function xpToNextLevel(level) {
+    return 100 + (level - 1) * 25;
+}
+
+function applyXp(stats, gainedXp) {
+    let xp = stats.xp + gainedXp;
+    let level = stats.level;
+    let needed = xpToNextLevel(level);
+    while (xp >= needed) {
+        xp -= needed;
+        level += 1;
+        needed = xpToNextLevel(level);
+    }
+    return { ...stats, xp, level };
+}
+
+function calculatePurchaseBonus(level) {
+    const base = 10 + level;
+    let percent = 0.5;
+    if (level >= 16 && level <= 30) {
+        percent = 0.25;
+    } else if (level >= 31) {
+        percent = 0.01;
+    }
+    const bonus = Math.round(base * percent);
+    return { base, bonus, percent };
+}
+
+function awardPurchaseRewards(amountDkk, event) {
+    if (isGuestUser()) {
+        addNotification('Gæster kan ikke optjene point eller xp.');
+        return;
+    }
+    if (!amountDkk || amountDkk <= 0) {
+        addNotification('Køb registreret, men pris mangler – ingen point/xp tilføjet.');
+        return;
+    }
+
+    const stats = getUserStats();
+    const roundedAmount = Math.round(amountDkk);
+    const bonus = calculatePurchaseBonus(stats.level);
+    const totalXp = roundedAmount + bonus.base + bonus.bonus;
+
+    let updated = { ...stats, points: stats.points + roundedAmount };
+    updated = applyXp(updated, totalXp);
+    saveUserStats(updated);
+
+    const eventName = event?.name ? ` for ${event.name}` : '';
+    addNotification(`Køb gennemført${eventName}. +${roundedAmount} point og +${totalXp} xp.`);
+}
+
+function updateStatsUI(stats = getUserStats()) {
+    const headerPoints = document.getElementById('headerPoints');
+    const headerLevel = document.getElementById('headerLevel');
+    const shopPoints = document.getElementById('shopPoints');
+    if (headerPoints) headerPoints.textContent = stats.points;
+    if (shopPoints) shopPoints.textContent = stats.points;
+    if (headerLevel) headerLevel.textContent = stats.level;
+}
+
+function addNotification(text) {
+    if (isGuestUser()) {
+        guestNotifications.unshift({ text, stamp: new Date().toLocaleString('da-DK', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' }) });
+        guestNotifications = guestNotifications.slice(0, 50);
+        renderNotifications();
+        return;
+    }
+    const list = getNotifications();
+    const stamp = new Date().toLocaleString('da-DK', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: 'short' });
+    list.unshift({ text, stamp });
+    localStorage.setItem(getNotificationsKey(), JSON.stringify(list.slice(0, 50)));
+    renderNotifications();
+}
+
+function getNotifications() {
+    if (isGuestUser()) return [...guestNotifications];
+    const raw = localStorage.getItem(getNotificationsKey());
+    if (!raw) return [];
+    try {
+        return JSON.parse(raw) || [];
+    } catch (e) {
+        return [];
+    }
+}
+
+function renderNotifications() {
+    const list = document.getElementById('notificationsList');
+    if (!list) return;
+    list.innerHTML = '';
+    const items = getNotifications();
+    if (items.length === 0) {
+        const li = document.createElement('li');
+        li.textContent = 'Ingen notifikationer endnu.';
+        list.appendChild(li);
+        return;
+    }
+    items.forEach(item => {
+        const li = document.createElement('li');
+        li.textContent = `${item.text} (${item.stamp})`;
+        list.appendChild(li);
+    });
+}
+
+const pointShopItems = [
+    { id: 'skin_fire', name: '🔥 Flamme Outfit', description: 'Unikt outfit til din avatar.', price: 350 },
+    { id: 'pet_dragon', name: '🐉 Mini Drage', description: 'Følgesvend til din profil.', price: 520 },
+    { id: 'badge_gold', name: '🥇 Guld Badge', description: 'Vis dit niveau frem.', price: 180 },
+    { id: 'theme_neon', name: '🌈 Neon Tema', description: 'Skift farvetema.', price: 260 }
+];
+
+const dkkShopItems = [
+    { id: 'vip_pass', name: '🎫 VIP Pass', description: 'Adgang til eksklusive events.', price: 129 },
+    { id: 'pro_avatar', name: '✨ Pro Avatar Pack', description: 'Ekstra tilpasninger.', price: 79 },
+    { id: 'supporter', name: '❤️ Supporter Pack', description: 'Støt projektet.', price: 49 }
+];
+
+function renderShopItems(items, container, mode) {
+    if (!container) return;
+    container.innerHTML = '';
+    items.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'shop-item';
+
+        const title = document.createElement('h4');
+        title.textContent = item.name;
+
+        const desc = document.createElement('p');
+        desc.textContent = item.description;
+
+        const price = document.createElement('p');
+        price.textContent = mode === 'points'
+            ? `${item.price} point`
+            : `${item.price} DKK`;
+
+        const btn = document.createElement('button');
+        btn.textContent = mode === 'points' ? 'Køb for point' : 'Køb for DKK';
+        btn.addEventListener('click', () => handleShopPurchase(item, mode));
+
+        card.appendChild(title);
+        card.appendChild(desc);
+        card.appendChild(price);
+        card.appendChild(btn);
+        container.appendChild(card);
+    });
+}
+
+function initPointShop() {
+    renderShopItems(pointShopItems, document.getElementById('shopPointsGrid'), 'points');
+    renderShopItems(dkkShopItems, document.getElementById('shopDkkGrid'), 'dkk');
+}
+
+function handleShopPurchase(item, mode) {
+    if (isGuestUser()) {
+        addNotification('Gæsteprofil kan ikke gemme køb eller point.');
+        return;
+    }
+    const stats = getUserStats();
+    if (mode === 'points') {
+        if (stats.points < item.price) {
+            addNotification('Du har ikke nok point til dette køb.');
+            return;
+        }
+        saveUserStats({ ...stats, points: stats.points - item.price });
+        addNotification(`Købte ${item.name} for ${item.price} point.`);
+        return;
+    }
+    addNotification('DKK-køb afventer betaling. Point gives først når transaktionen er gennemført.');
+}
+
+function switchShopTab(tab) {
+    const pointsGrid = document.getElementById('shopPointsGrid');
+    const dkkGrid = document.getElementById('shopDkkGrid');
+    const tabs = document.querySelectorAll('.shop-tab');
+    tabs.forEach(btn => btn.classList.remove('active'));
+    const activeBtn = document.querySelector(`.shop-tab[data-shop-tab="${tab}"]`);
+    if (activeBtn) activeBtn.classList.add('active');
+    if (tab === 'dkk') {
+        pointsGrid?.classList.add('hidden');
+        dkkGrid?.classList.remove('hidden');
+    } else {
+        pointsGrid?.classList.remove('hidden');
+        dkkGrid?.classList.add('hidden');
+    }
+}
+
+let currentChatContact = null;
+
+function createChatContactItem(contact) {
+    const item = document.createElement('div');
+    item.className = 'chat-contact';
+    item.dataset.contactId = contact.id;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'chat-avatar';
+    avatar.textContent = contact.initials || '🤖';
+
+    const meta = document.createElement('div');
+    meta.className = 'friend-meta';
+
+    const name = document.createElement('div');
+    name.className = 'friend-name';
+    name.textContent = contact.name;
+
+    const sub = document.createElement('div');
+    sub.className = 'friend-subtext';
+    sub.textContent = contact.subtitle;
+
+    meta.appendChild(name);
+    meta.appendChild(sub);
+
+    item.appendChild(avatar);
+    item.appendChild(meta);
+    item.addEventListener('click', () => selectChatContact(contact.id));
+    return item;
+}
+
+function renderChatMessages(contactId) {
+    const container = document.getElementById('chatMessages');
+    if (!container) return;
+    container.innerHTML = '';
+    if (!contactId) {
+        const empty = document.createElement('div');
+        empty.className = 'friends-empty';
+        empty.textContent = 'Vælg en kontakt for at skrive.';
+        container.appendChild(empty);
+        return;
+    }
+    let messages = [];
+    if (isGuestUser()) {
+        messages = guestChats[contactId] || [];
+    } else {
+        const raw = localStorage.getItem(getChatKey(contactId));
+        messages = raw ? JSON.parse(raw) : [];
+    }
+    messages.forEach(msg => {
+        const bubble = document.createElement('div');
+        bubble.className = `chat-message ${msg.from === 'me' ? 'self' : 'other'}`;
+        bubble.textContent = msg.text;
+        container.appendChild(bubble);
+    });
+    container.scrollTop = container.scrollHeight;
+}
+
+function saveChatMessage(contactId, message) {
+    if (isGuestUser()) {
+        const messages = guestChats[contactId] || [];
+        messages.push(message);
+        guestChats[contactId] = messages.slice(-100);
+        renderChatMessages(contactId);
+        return;
+    }
+    const raw = localStorage.getItem(getChatKey(contactId));
+    const messages = raw ? JSON.parse(raw) : [];
+    messages.push(message);
+    localStorage.setItem(getChatKey(contactId), JSON.stringify(messages.slice(-100)));
+    renderChatMessages(contactId);
+}
+
+function selectChatContact(contactId) {
+    currentChatContact = contactId;
+    const contacts = document.querySelectorAll('.chat-contact');
+    contacts.forEach(el => el.classList.remove('active'));
+    const active = document.querySelector(`.chat-contact[data-contact-id="${contactId}"]`);
+    if (active) active.classList.add('active');
+    renderChatMessages(contactId);
+}
+
+async function loadChatContacts() {
+    const container = document.getElementById('chatContacts');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const assistantContact = {
+        id: 'assistant',
+        name: 'Begivenheds vejleder',
+        subtitle: 'AI assistent',
+        initials: 'AI'
+    };
+    const current = getCurrentUser();
+
+    const title = document.createElement('div');
+    title.className = 'chat-section-title';
+    title.textContent = 'Kontakter';
+    container.appendChild(title);
+
+    const aiLabel = document.createElement('div');
+    aiLabel.className = 'chat-section-title';
+    aiLabel.textContent = 'AI assistent';
+    container.appendChild(aiLabel);
+    container.appendChild(createChatContactItem(assistantContact));
+
+    const friendsLabel = document.createElement('div');
+    friendsLabel.className = 'chat-section-title';
+    friendsLabel.textContent = 'Venner';
+    container.appendChild(friendsLabel);
+
+    const contacts = [assistantContact];
+    if (current && !current.isGuest) {
+        const friends = await getFriends(current.email);
+        const allUsers = await getAllUserProfiles();
+        friends.forEach(email => {
+            const user = allUsers.find(u => u.email === email) || { name: email, email };
+            const initials = (user.name || email)
+                .split(' ')
+                .map(part => part[0])
+                .join('')
+                .substring(0, 2)
+                .toUpperCase();
+            const contact = { id: email, name: user.name || email, subtitle: user.email || email, initials };
+            contacts.push(contact);
+            container.appendChild(createChatContactItem(contact));
+        });
+    }
+
+    if (!currentChatContact && contacts.length > 0) {
+        selectChatContact(contacts[0].id);
+    }
+}
+
+function getAssistantReply(text) {
+    const lower = text.toLowerCase();
+    if (lower.includes('event') || lower.includes('begiven')) {
+        return 'Jeg kan hjælpe dig med at finde de bedste begivenheder. Prøv at gå til event-listen.';
+    }
+    if (lower.includes('point') || lower.includes('xp')) {
+        return 'Du tjener point og xp ved køb eller når du trykker deltager på en begivenhed.';
+    }
+    if (lower.includes('ven')) {
+        return 'Du kan tilføje venner via venne-siden og chatte her.';
+    }
+    return 'Jeg hjælper gerne. Spørg mig om events, point eller funktioner.';
+}
+
+function sendChatMessage() {
+    const input = document.getElementById('chatInput');
+    if (!input) return;
+    const text = input.value.trim();
+    if (!text || !currentChatContact) return;
+    input.value = '';
+
+    saveChatMessage(currentChatContact, { from: 'me', text, at: Date.now() });
+
+    if (currentChatContact === 'assistant') {
+        const reply = getAssistantReply(text);
+        setTimeout(() => {
+            saveChatMessage(currentChatContact, { from: 'assistant', text: reply, at: Date.now() });
+        }, 600);
+    }
+}
+
+function formatPrice(price, currency = 'DKK') {
+    if (price == null) return '';
+    return new Intl.NumberFormat('da-DK', { style: 'currency', currency }).format(price);
+}
+
+// Avatar 3D variables
+let avatarScene, avatarCamera, avatarRenderer;
+let avatarScenePreview, avatarCameraPreview, avatarRendererPreview;
+let avatarGroup, headMesh, bodyMesh, armMeshes = [], legMeshes = [], hairMesh, eyeMeshes = [];
+let avatarGroupPreview, previewGroup;
+let mouseX = 0, mouseY = 0;
+let pendingMitidCpr = null;
+let currentAvatarState = {
+    bodyType: 'normal',
+    headShape: 'box',
+    headColor: '#FDBCB4',
+    hairColor: '#8B4513',
+    bodyColor: '#4169E1',
+    pantsColor: '#333333',
+    shoesColor: '#000000',
+    expression: 'happy'
+};
+
+function resizeAvatarCanvas() {
+    const canvas = document.getElementById('avatarCanvas');
+    if (canvas && avatarRenderer && avatarCamera) {
+        const rect = canvas.getBoundingClientRect();
+        const width = Math.max(1, Math.round(rect.width));
+        const height = Math.max(1, Math.round(rect.height));
+        avatarRenderer.setSize(width, height, false);
+        avatarCamera.aspect = width / height;
+        avatarCamera.updateProjectionMatrix();
+    }
+
+    const previewCanvas = document.getElementById('avatarCanvasPreview');
+    if (previewCanvas && avatarRendererPreview && avatarCameraPreview) {
+        const rect = previewCanvas.getBoundingClientRect();
+        const width = Math.max(1, Math.round(rect.width));
+        const height = Math.max(1, Math.round(rect.height));
+        avatarRendererPreview.setSize(width, height, false);
+        avatarCameraPreview.aspect = width / height;
+        avatarCameraPreview.updateProjectionMatrix();
+    }
+}
+
+function initAvatarScene() {
+    const canvas = document.getElementById('avatarCanvas');
+    if (!canvas) return;
+
+    // Scene setup
+    avatarScene = new THREE.Scene();
+    avatarScene.background = new THREE.Color(0x667eea);
+
+    // Camera
+    avatarCamera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+    avatarCamera.position.z = 3.5;
+
+    // Renderer
+    avatarRenderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+    avatarRenderer.setPixelRatio(window.devicePixelRatio);
+    resizeAvatarCanvas();
+
+    // Lighting
+    const light1 = new THREE.DirectionalLight(0xffffff, 1);
+    light1.position.set(5, 5, 5);
+    avatarScene.add(light1);
+    
+    const light2 = new THREE.DirectionalLight(0xffffff, 0.5);
+    light2.position.set(-5, -5, 5);
+    avatarScene.add(light2);
+    
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    avatarScene.add(ambientLight);
+
+    // Avatar group
+    avatarGroup = new THREE.Group();
+    avatarScene.add(avatarGroup);
+
+    // Create avatar parts
+    createAvatarParts();
+
+    // Animation loop
+    function animate() {
+        requestAnimationFrame(animate);
+        avatarGroup.rotation.y += 0.005;
+        avatarGroup.rotation.x = mouseY * 0.2;
+        avatarRenderer.render(avatarScene, avatarCamera);
+    }
+    animate();
+
+    // Mouse movement
+    canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        mouseY = ((e.clientY - rect.top) / rect.height - 0.5) * 0.8;
+    });
+
+    // Wheel zoom
+    canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const zoom = e.deltaY > 0 ? 0.1 : -0.1;
+        avatarCamera.position.z = Math.max(2, Math.min(6, avatarCamera.position.z + zoom));
+    });
+}
+
+function initAvatarPreview() {
+    const canvas = document.getElementById('avatarCanvasPreview');
+    if (!canvas) return;
+
+    // Scene setup
+    avatarScenePreview = new THREE.Scene();
+    avatarScenePreview.background = new THREE.Color(0x667eea);
+
+    // Camera
+    avatarCameraPreview = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
+    avatarCameraPreview.position.z = 3.5;
+
+    // Renderer
+    avatarRendererPreview = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+    avatarRendererPreview.setPixelRatio(window.devicePixelRatio);
+    resizeAvatarCanvas();
+
+    // Lighting
+    const light1 = new THREE.DirectionalLight(0xffffff, 1);
+    light1.position.set(5, 5, 5);
+    avatarScenePreview.add(light1);
+    
+    const light2 = new THREE.DirectionalLight(0xffffff, 0.5);
+    light2.position.set(-5, -5, 5);
+    avatarScenePreview.add(light2);
+    
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    avatarScenePreview.add(ambientLight);
+
+    // Avatar group
+    avatarGroupPreview = new THREE.Group();
+    avatarScenePreview.add(avatarGroupPreview);
+
+    // Create avatar parts for preview
+    createAvatarPartsPreview();
+
+    // Animation loop
+    function animate() {
+        requestAnimationFrame(animate);
+        avatarGroupPreview.rotation.y += 0.005;
+        avatarRendererPreview.render(avatarScenePreview, avatarCameraPreview);
+    }
+    animate();
+}
+
+function createAvatarParts() {
+    avatarGroup.children = [];
+    eyeMeshes = [];
+    armMeshes = [];
+    legMeshes = [];
+
+    const bodyType = document.getElementById('bodyType').value || 'normal';
+    const headShape = document.getElementById('headShape').value || 'box';
+    
+    // Create head based on shape
+    let headGeometry;
+    if (headShape === 'sphere') {
+        headGeometry = new THREE.SphereGeometry(0.35, 32, 32);
+    } else if (headShape === 'oval') {
+        headGeometry = new THREE.SphereGeometry(0.35, 32, 32);
+        headGeometry.scale(1, 1.2, 1);
+    } else {
+        headGeometry = new THREE.BoxGeometry(0.6, 0.8, 0.6);
+    }
+
+    const headMaterial = new THREE.MeshPhongMaterial({ color: currentAvatarState.headColor });
+    headMesh = new THREE.Mesh(headGeometry, headMaterial);
+    headMesh.position.y = 0.8;
+    avatarGroup.add(headMesh);
+
+    // Hair
+    const hairGeometry = new THREE.BoxGeometry(0.7, 0.35, 0.65);
+    const hairMaterial = new THREE.MeshPhongMaterial({ color: currentAvatarState.hairColor });
+    hairMesh = new THREE.Mesh(hairGeometry, hairMaterial);
+    hairMesh.position.y = 1.25;
+    hairMesh.position.z = -0.05;
+    avatarGroup.add(hairMesh);
+
+    // Eyes
+    const eyeGeometry = new THREE.SphereGeometry(0.08, 16, 16);
+    const eyeMaterial = new THREE.MeshPhongMaterial({ color: 0x000000 });
+    
+    const eye1 = new THREE.Mesh(eyeGeometry, eyeMaterial);
+    eye1.position.set(-0.15, 0.95, 0.35);
+    avatarGroup.add(eye1);
+    eyeMeshes.push(eye1);
+
+    const eye2 = new THREE.Mesh(eyeGeometry, eyeMaterial);
+    eye2.position.set(0.15, 0.95, 0.35);
+    avatarGroup.add(eye2);
+    eyeMeshes.push(eye2);
+
+    // Expression details (eyebrows)
+    const browGeometry = new THREE.BoxGeometry(0.12, 0.05, 0.02);
+    const browMaterial = new THREE.MeshPhongMaterial({ color: currentAvatarState.hairColor });
+    
+    const brow1 = new THREE.Mesh(browGeometry, browMaterial);
+    brow1.position.set(-0.15, 1.1, 0.35);
+    avatarGroup.add(brow1);
+
+    const brow2 = new THREE.Mesh(browGeometry, browMaterial);
+    brow2.position.set(0.15, 1.1, 0.35);
+    avatarGroup.add(brow2);
+
+    // Body sizing based on type
+    let bodyGeometry, bodyY;
+    switch(currentAvatarState.bodyType) {
+        case 'slim':
+            bodyGeometry = new THREE.BoxGeometry(0.35, 0.9, 0.3);
+            bodyY = -0.15;
+            break;
+        case 'athletic':
+            bodyGeometry = new THREE.BoxGeometry(0.6, 0.85, 0.35);
+            bodyY = -0.1;
+            break;
+        case 'large':
+            bodyGeometry = new THREE.BoxGeometry(0.75, 0.8, 0.45);
+            bodyY = -0.1;
+            break;
+        default:
+            bodyGeometry = new THREE.BoxGeometry(0.5, 0.85, 0.35);
+            bodyY = -0.15;
+    }
+
+    const bodyMaterial = new THREE.MeshPhongMaterial({ color: currentAvatarState.bodyColor });
+    bodyMesh = new THREE.Mesh(bodyGeometry, bodyMaterial);
+    bodyMesh.position.y = bodyY;
+    avatarGroup.add(bodyMesh);
+
+    // Arms
+    const armGeometry = new THREE.BoxGeometry(0.15, 0.7, 0.15);
+    const armMaterial = new THREE.MeshPhongMaterial({ color: currentAvatarState.headColor });
+
+    const arm1 = new THREE.Mesh(armGeometry, armMaterial);
+    arm1.position.set(-0.4, 0.2, 0);
+    avatarGroup.add(arm1);
+    armMeshes.push(arm1);
+
+    const arm2 = new THREE.Mesh(armGeometry, armMaterial);
+    arm2.position.set(0.4, 0.2, 0);
+    avatarGroup.add(arm2);
+    armMeshes.push(arm2);
+
+    // Pants
+    const pantsGeometry = new THREE.BoxGeometry(0.5, 0.4, 0.35);
+    const pantsMaterial = new THREE.MeshPhongMaterial({ color: currentAvatarState.pantsColor });
+    const pants = new THREE.Mesh(pantsGeometry, pantsMaterial);
+    pants.position.y = -0.65;
+    avatarGroup.add(pants);
+
+    // Legs
+    const legGeometry = new THREE.BoxGeometry(0.2, 0.5, 0.2);
+    const shoesMaterial = new THREE.MeshPhongMaterial({ color: currentAvatarState.shoesColor });
+
+    const leg1 = new THREE.Mesh(legGeometry, shoesMaterial);
+    leg1.position.set(-0.15, -1.3, 0);
+    avatarGroup.add(leg1);
+    legMeshes.push(leg1);
+
+    const leg2 = new THREE.Mesh(legGeometry, shoesMaterial);
+    leg2.position.set(0.15, -1.3, 0);
+    avatarGroup.add(leg2);
+    legMeshes.push(leg2);
+
+    // Update preview too
+    if (avatarGroupPreview) {
+        createAvatarPartsPreview();
+    }
+}
+
+function createAvatarPartsPreview() {
+    avatarGroupPreview.children = [];
+
+    const bodyType = currentAvatarState.bodyType;
+    const headShape = currentAvatarState.headShape;
+    
+    // Create head based on shape
+    let headGeometry;
+    if (headShape === 'sphere') {
+        headGeometry = new THREE.SphereGeometry(0.35, 32, 32);
+    } else if (headShape === 'oval') {
+        headGeometry = new THREE.SphereGeometry(0.35, 32, 32);
+        headGeometry.scale(1, 1.2, 1);
+    } else {
+        headGeometry = new THREE.BoxGeometry(0.6, 0.8, 0.6);
+    }
+
+    const headMaterial = new THREE.MeshPhongMaterial({ color: currentAvatarState.headColor });
+    const head = new THREE.Mesh(headGeometry, headMaterial);
+    head.position.y = 0.8;
+    avatarGroupPreview.add(head);
+
+    // Hair
+    const hairGeometry = new THREE.BoxGeometry(0.7, 0.35, 0.65);
+    const hairMaterial = new THREE.MeshPhongMaterial({ color: currentAvatarState.hairColor });
+    const hair = new THREE.Mesh(hairGeometry, hairMaterial);
+    hair.position.y = 1.25;
+    hair.position.z = -0.05;
+    avatarGroupPreview.add(hair);
+
+    // Eyes
+    const eyeGeometry = new THREE.SphereGeometry(0.08, 16, 16);
+    const eyeMaterial = new THREE.MeshPhongMaterial({ color: 0x000000 });
+    
+    const eye1 = new THREE.Mesh(eyeGeometry, eyeMaterial);
+    eye1.position.set(-0.15, 0.95, 0.35);
+    avatarGroupPreview.add(eye1);
+
+    const eye2 = new THREE.Mesh(eyeGeometry, eyeMaterial);
+    eye2.position.set(0.15, 0.95, 0.35);
+    avatarGroupPreview.add(eye2);
+
+    // Body sizing based on type
+    let bodyGeometry, bodyY;
+    switch(bodyType) {
+        case 'slim':
+            bodyGeometry = new THREE.BoxGeometry(0.35, 0.9, 0.3);
+            bodyY = -0.15;
+            break;
+        case 'athletic':
+            bodyGeometry = new THREE.BoxGeometry(0.6, 0.85, 0.35);
+            bodyY = -0.1;
+            break;
+        case 'large':
+            bodyGeometry = new THREE.BoxGeometry(0.75, 0.8, 0.45);
+            bodyY = -0.1;
+            break;
+        default:
+            bodyGeometry = new THREE.BoxGeometry(0.5, 0.85, 0.35);
+            bodyY = -0.15;
+    }
+
+    const bodyMaterial = new THREE.MeshPhongMaterial({ color: currentAvatarState.bodyColor });
+    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+    body.position.y = bodyY;
+    avatarGroupPreview.add(body);
+
+    // Arms
+    const armGeometry = new THREE.BoxGeometry(0.15, 0.7, 0.15);
+    const armMaterial = new THREE.MeshPhongMaterial({ color: currentAvatarState.headColor });
+
+    const arm1 = new THREE.Mesh(armGeometry, armMaterial);
+    arm1.position.set(-0.4, 0.2, 0);
+    avatarGroupPreview.add(arm1);
+
+    const arm2 = new THREE.Mesh(armGeometry, armMaterial);
+    arm2.position.set(0.4, 0.2, 0);
+    avatarGroupPreview.add(arm2);
+
+    // Pants
+    const pantsGeometry = new THREE.BoxGeometry(0.5, 0.4, 0.35);
+    const pantsMaterial = new THREE.MeshPhongMaterial({ color: currentAvatarState.pantsColor });
+    const pants = new THREE.Mesh(pantsGeometry, pantsMaterial);
+    pants.position.y = -0.65;
+    avatarGroupPreview.add(pants);
+
+    // Legs
+    const legGeometry = new THREE.BoxGeometry(0.2, 0.5, 0.2);
+    const shoesMaterial = new THREE.MeshPhongMaterial({ color: currentAvatarState.shoesColor });
+
+    const leg1 = new THREE.Mesh(legGeometry, shoesMaterial);
+    leg1.position.set(-0.15, -1.3, 0);
+    avatarGroupPreview.add(leg1);
+
+    const leg2 = new THREE.Mesh(legGeometry, shoesMaterial);
+    leg2.position.set(0.15, -1.3, 0);
+    avatarGroupPreview.add(leg2);
+}
+
+function updateAvatarColors() {
+    currentAvatarState.headColor = document.getElementById('headColor').value;
+    currentAvatarState.hairColor = document.getElementById('hairColor').value;
+    currentAvatarState.bodyColor = document.getElementById('bodyColor').value;
+    currentAvatarState.pantsColor = document.getElementById('pantsColor').value;
+    currentAvatarState.shoesColor = document.getElementById('shoesColor').value;
+
+    // Update colors on existing meshes
+    const meshes = avatarGroup.children;
+    if (meshes[0] && meshes[0].material) {
+        meshes[0].material.color.setStyle(currentAvatarState.headColor); // Head
+    }
+    if (meshes[1] && meshes[1].material) {
+        meshes[1].material.color.setStyle(currentAvatarState.hairColor); // Hair
+    }
+    meshes.forEach((mesh, i) => {
+        if (i === 5 || i === 6) {
+            mesh.material.color.setStyle(currentAvatarState.headColor); // Arms
+        }
+    });
+
+    if (avatarGroupPreview) {
+        createAvatarPartsPreview();
+    }
+}
+
+function updateAvatarBody() {
+    currentAvatarState.bodyType = document.getElementById('bodyType').value;
+    createAvatarParts();
+}
+
+function updateAvatarHead() {
+    currentAvatarState.headShape = document.getElementById('headShape').value;
+    createAvatarParts();
+}
+
+function updateAvatarExpression() {
+    currentAvatarState.expression = document.getElementById('expression').value;
+    createAvatarParts();
+}
+
+function resetAvatar() {
+    currentAvatarState = {
+        bodyType: 'normal',
+        headShape: 'box',
+        headColor: '#FDBCB4',
+        hairColor: '#8B4513',
+        bodyColor: '#4169E1',
+        pantsColor: '#333333',
+        shoesColor: '#000000',
+        expression: 'happy'
+    };
+    
+    document.getElementById('bodyType').value = 'normal';
+    document.getElementById('headShape').value = 'box';
+    document.getElementById('headColor').value = '#FDBCB4';
+    document.getElementById('hairColor').value = '#8B4513';
+    document.getElementById('bodyColor').value = '#4169E1';
+    document.getElementById('pantsColor').value = '#333333';
+    document.getElementById('shoesColor').value = '#000000';
+    document.getElementById('expression').value = 'happy';
+    
+    createAvatarParts();
+}
+
+async function saveAvatarAppearance() {
+    const currentUser = sessionStorage.getItem('currentUser');
+    if (currentUser) {
+        const user = JSON.parse(currentUser);
+        if (user.isGuest) {
+            alert('✅ Avatar gemt lokalt for gæst.');
+            return;
+        }
+        await apiRequest(`/api/avatar/${encodeURIComponent(user.email)}`, {
+            method: 'PUT',
+            body: JSON.stringify({ data: currentAvatarState })
+        });
+        alert('✅ Avatar gemt!');
+    }
+}
+
+async function loadAvatarAppearance() {
+    const currentUser = sessionStorage.getItem('currentUser');
+    if (currentUser) {
+        const user = JSON.parse(currentUser);
+        if (user.isGuest) return;
+        try {
+            const response = await apiRequest(`/api/avatar/${encodeURIComponent(user.email)}`);
+            if (response?.data) {
+                currentAvatarState = response.data;
+
+                // Restore form values
+                const bodyTypeInput = document.getElementById('bodyType');
+                const headShapeInput = document.getElementById('headShape');
+                const headColorInput = document.getElementById('headColor');
+                const hairColorInput = document.getElementById('hairColor');
+                const bodyColorInput = document.getElementById('bodyColor');
+                const pantsColorInput = document.getElementById('pantsColor');
+                const shoesColorInput = document.getElementById('shoesColor');
+                const expressionInput = document.getElementById('expression');
+
+                if (bodyTypeInput) bodyTypeInput.value = currentAvatarState.bodyType;
+                if (headShapeInput) headShapeInput.value = currentAvatarState.headShape;
+                if (headColorInput) headColorInput.value = currentAvatarState.headColor;
+                if (hairColorInput) hairColorInput.value = currentAvatarState.hairColor;
+                if (bodyColorInput) bodyColorInput.value = currentAvatarState.bodyColor;
+                if (pantsColorInput) pantsColorInput.value = currentAvatarState.pantsColor;
+                if (shoesColorInput) shoesColorInput.value = currentAvatarState.shoesColor;
+                if (expressionInput) expressionInput.value = currentAvatarState.expression;
+            }
+        } catch (err) {
+            // ignore missing avatar
+        }
+    }
+}
+
+function openProfilePage() {
+    navigateTo('/profile/');
+}
+
+function backToDashboard() {
+    navigateTo('/');
+}
+
+function openPointShop() {
+    navigateTo('/pointshop/');
+}
+
+function closePointShop() {
+    navigateTo('/');
+}
+
+function openEventsPage() {
+    navigateTo('/events/');
+}
+
+function goHome() {
+    navigateTo('/');
+}
+
+function openAllEventsPage() {
+    navigateTo('/all-events/');
+}
+
+function closeEventsPage() {
+    navigateTo('/');
+}
+
+function closeAllEventsPage() {
+    navigateTo('/');
+}
+
+async function openFriendsPage() {
+    if (isGuestUser()) {
+        addNotification('Gæster har ikke adgang til venner.');
+        return;
+    }
+    navigateTo('/friends/');
+}
+
+function closeFriendsPage() {
+    navigateTo('/');
+}
+
+function openSettingsPage() {
+    navigateTo('/settings/');
+}
+
+function closeSettingsPage() {
+    navigateTo('/');
+}
+
+function openNotificationsPage() {
+    navigateTo('/notifications/');
+}
+
+function closeNotificationsPage() {
+    navigateTo('/');
+}
+
+async function openChatPage() {
+    navigateTo('/chat/');
+}
+
+function closeChatPage() {
+    navigateTo('/');
+}
+
+function getCurrentUser() {
+    const currentUser = sessionStorage.getItem('currentUser');
+    if (!currentUser) return null;
+    return JSON.parse(currentUser);
+}
+
+async function getAllUserProfiles() {
+    const users = await apiRequest('/api/users');
+    const seen = new Set();
+    return (users || []).filter(u => {
+        if (!u.email || seen.has(u.email)) return false;
+        seen.add(u.email);
+        return true;
+    });
+}
+
+async function getFriends(email) {
+    return apiRequest(`/api/friends/${encodeURIComponent(email)}`);
+}
+
+async function getFriendsOfFriends(email) {
+    const directFriends = await getFriends(email);
+    const fofSet = new Set();
+
+    await Promise.all((directFriends || []).map(async (friendEmail) => {
+        const friendsOfFriend = await getFriends(friendEmail);
+        (friendsOfFriend || []).forEach(fof => {
+            if (fof !== email && !directFriends.includes(fof)) {
+                fofSet.add(fof);
+            }
+        });
+    }));
+
+    return Array.from(fofSet);
+}
+
+async function getRequests(email) {
+    return apiRequest(`/api/requests/${encodeURIComponent(email)}`);
+}
+
+async function sendFriendRequest(targetEmail) {
+    const current = getCurrentUser();
+    if (!current || !current.email || current.isGuest) return;
+    if (targetEmail === current.email) return;
+
+    await apiRequest(`/api/requests/${encodeURIComponent(targetEmail)}`, {
+        method: 'POST',
+        body: JSON.stringify({ fromEmail: current.email })
+    });
+    await loadFriendsData();
+}
+
+async function acceptFriendRequest(fromEmail) {
+    const current = getCurrentUser();
+    if (!current || !current.email) return;
+
+    await apiRequest(`/api/friends/${encodeURIComponent(current.email)}`, {
+        method: 'POST',
+        body: JSON.stringify({ friendEmail: fromEmail })
+    });
+
+    await apiRequest(`/api/friends/${encodeURIComponent(fromEmail)}`, {
+        method: 'POST',
+        body: JSON.stringify({ friendEmail: current.email })
+    });
+
+    await apiRequest(`/api/requests/${encodeURIComponent(current.email)}?fromEmail=${encodeURIComponent(fromEmail)}`, {
+        method: 'DELETE'
+    });
+
+    await loadFriendsData();
+}
+
+async function declineFriendRequest(fromEmail) {
+    const current = getCurrentUser();
+    if (!current || !current.email) return;
+    await apiRequest(`/api/requests/${encodeURIComponent(current.email)}?fromEmail=${encodeURIComponent(fromEmail)}`, {
+        method: 'DELETE'
+    });
+    await loadFriendsData();
+}
+
+async function getUserLocationMap() {
+    return apiRequest('/api/locations');
+}
+
+async function saveUserLocation(email, location) {
+    await apiRequest(`/api/locations/${encodeURIComponent(email)}`, {
+        method: 'POST',
+        body: JSON.stringify({
+            lat: location.lat,
+            lng: location.lng,
+            updatedAt: location.updatedAt
+        })
+    });
+}
+
+async function updateUserLocation() {
+    const current = getCurrentUser();
+    if (!current || !current.email || current.isGuest) return;
+
+    const status = document.getElementById('friendsLocationStatus');
+    if (!navigator.geolocation) {
+        if (status) status.textContent = 'Lokation er ikke tilgængelig på denne enhed.';
+        return;
+    }
+
+    if (status) status.textContent = 'Henter lokation...';
+    navigator.geolocation.getCurrentPosition(
+        async (pos) => {
+            const location = {
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude,
+                updatedAt: Date.now()
+            };
+            await saveUserLocation(current.email, location);
+            if (status) status.textContent = '';
+            await loadFriendsData();
+        },
+        () => {
+            if (status) status.textContent = 'Tillad lokation for bedre forslag.';
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+    );
+}
+
+function getDistanceKm(a, b) {
+    if (!a || !b) return null;
+    const toRad = (v) => v * Math.PI / 180;
+    const R = 6371;
+    const dLat = toRad(b.lat - a.lat);
+    const dLng = toRad(b.lng - a.lng);
+    const lat1 = toRad(a.lat);
+    const lat2 = toRad(b.lat);
+    const x = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.sin(dLng / 2) * Math.sin(dLng / 2) * Math.cos(lat1) * Math.cos(lat2);
+    const c = 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
+    return R * c;
+}
+
+function buildFriendItem(user, options = {}) {
+    const item = document.createElement('div');
+    item.className = 'friend-item';
+
+    const meta = document.createElement('div');
+    meta.className = 'friend-meta';
+
+    const name = document.createElement('div');
+    name.className = 'friend-name';
+    name.textContent = user.name || 'Ukendt bruger';
+
+    const sub = document.createElement('div');
+    sub.className = 'friend-subtext';
+    sub.textContent = options.subtext || user.email || '';
+
+    meta.appendChild(name);
+    meta.appendChild(sub);
+
+    const actions = document.createElement('div');
+    actions.className = 'friend-actions';
+
+    if (options.actions) {
+        options.actions.forEach(btn => actions.appendChild(btn));
+    }
+
+    if (options.chip) {
+        const chip = document.createElement('div');
+        chip.className = 'friend-chip';
+        chip.textContent = options.chip;
+        actions.appendChild(chip);
+    }
+
+    item.appendChild(meta);
+    item.appendChild(actions);
+
+    item.addEventListener('click', (e) => {
+        if (e.target.tagName.toLowerCase() === 'button') return;
+        openFriendModal(user, options.distanceKm);
+    });
+
+    return item;
+}
+
+function openFriendModal(user, distanceKm) {
+    const modal = document.getElementById('friendModal');
+    const name = document.getElementById('friendModalName');
+    const info = document.getElementById('friendModalInfo');
+    if (!modal || !name || !info) return;
+
+    name.textContent = user.name || 'Profil';
+    const distanceText = distanceKm ? `${distanceKm.toFixed(1)} km væk` : 'Afstand ukendt';
+    info.innerHTML = `
+        <div><strong>E-mail:</strong> ${user.email || 'Ukendt'}</div>
+        <div><strong>Afstand:</strong> ${distanceText}</div>
+        <div><strong>Status:</strong> ${user.isFriend ? 'Ven' : 'Ikke ven'}</div>
+    `;
+    modal.classList.add('show');
+}
+
+function closeFriendModal() {
+    const modal = document.getElementById('friendModal');
+    if (modal) modal.classList.remove('show');
+}
+
+function handleFriendSearch() {
+    const input = document.getElementById('friendsSearchInput');
+    if (!input) return;
+    const query = input.value.trim().toLowerCase();
+    renderSearchResults(query);
+}
+
+async function renderSearchResults(query = '') {
+    const container = document.getElementById('friendsSearchResults');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const current = getCurrentUser();
+    if (!current) return;
+    const allUsers = (await getAllUserProfiles()).filter(u => u.email !== current.email);
+
+    const filtered = query
+        ? allUsers.filter(u => (u.name || '').toLowerCase().includes(query) || (u.email || '').toLowerCase().includes(query))
+        : [];
+
+    if (!query) {
+        const empty = document.createElement('div');
+        empty.className = 'friends-empty';
+        empty.textContent = 'Skriv for at søge efter brugere.';
+        container.appendChild(empty);
+        return;
+    }
+
+    if (filtered.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'friends-empty';
+        empty.textContent = 'Ingen brugere fundet.';
+        container.appendChild(empty);
+        return;
+    }
+
+    const friends = await getFriends(current.email);
+    const requests = await getRequests(current.email);
+    filtered.forEach(user => {
+        const isFriend = friends.includes(user.email);
+        const isRequested = requests.includes(user.email);
+        const button = document.createElement('button');
+        button.className = isFriend ? 'friend-secondary-btn' : 'friend-add-btn';
+        button.textContent = isFriend ? 'Venner' : (isRequested ? 'Afventer' : 'Tilføj');
+        if (isFriend || isRequested) {
+            button.disabled = true;
+        }
+        button.addEventListener('click', () => sendFriendRequest(user.email));
+
+        user.isFriend = isFriend;
+        container.appendChild(buildFriendItem(user, { actions: [button] }));
+    });
+}
+
+async function renderSuggestions() {
+    const container = document.getElementById('friendsSuggestions');
+    const status = document.getElementById('friendsLocationStatus');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const current = getCurrentUser();
+    if (!current || !current.email) return;
+
+    const allUsers = (await getAllUserProfiles()).filter(u => u.email !== current.email);
+    const locationMap = await getUserLocationMap();
+    const currentLocation = locationMap[current.email];
+    const friends = await getFriends(current.email);
+    const requests = await getRequests(current.email);
+
+    const hasLocation = !!currentLocation;
+    if (!hasLocation) {
+        if (status) status.textContent = 'Lokation ikke tilladt – viser alternative forslag.';
+    } else if (status) {
+        status.textContent = '';
+    }
+
+    let suggestions = [];
+
+    if (hasLocation) {
+        suggestions = allUsers
+            .map(user => {
+                const distance = locationMap[user.email]
+                    ? getDistanceKm(currentLocation, locationMap[user.email])
+                    : null;
+                return { ...user, distance };
+            })
+            .sort((a, b) => {
+                if (a.distance == null && b.distance == null) return 0;
+                if (a.distance == null) return 1;
+                if (b.distance == null) return -1;
+                return a.distance - b.distance;
+            })
+            .slice(0, 8);
+    } else {
+        const fofEmails = await getFriendsOfFriends(current.email);
+        const fofUsers = allUsers.filter(u => fofEmails.includes(u.email));
+        suggestions = (fofUsers.length > 0 ? fofUsers : allUsers)
+            .slice(0, 8)
+            .map(user => ({ ...user, distance: null }));
+    }
+
+    if (suggestions.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'friends-empty';
+        empty.textContent = 'Ingen forslag endnu.';
+        container.appendChild(empty);
+        return;
+    }
+
+    suggestions.forEach(user => {
+        const isFriend = friends.includes(user.email);
+        const isRequested = requests.includes(user.email);
+        const button = document.createElement('button');
+        button.className = isFriend ? 'friend-secondary-btn' : 'friend-add-btn';
+        button.textContent = isFriend ? 'Venner' : (isRequested ? 'Afventer' : 'Tilføj');
+        if (isFriend || isRequested) button.disabled = true;
+        button.addEventListener('click', () => sendFriendRequest(user.email));
+
+        const distanceText = user.distance != null ? `${user.distance.toFixed(1)} km væk` : 'Forslag';
+        user.isFriend = isFriend;
+        container.appendChild(buildFriendItem(user, {
+            subtext: distanceText,
+            actions: [button],
+            distanceKm: user.distance
+        }));
+    });
+}
+
+async function renderRequests() {
+    const container = document.getElementById('friendsRequests');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const current = getCurrentUser();
+    if (!current || !current.email) return;
+    const requests = await getRequests(current.email);
+    const allUsers = await getAllUserProfiles();
+
+    if (requests.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'friends-empty';
+        empty.textContent = 'Ingen anmodninger.';
+        container.appendChild(empty);
+        return;
+    }
+
+    requests.forEach(email => {
+        const user = allUsers.find(u => u.email === email) || { name: email, email };
+        const acceptBtn = document.createElement('button');
+        acceptBtn.className = 'friend-add-btn';
+        acceptBtn.textContent = 'Acceptér';
+        acceptBtn.addEventListener('click', () => acceptFriendRequest(email));
+
+        const declineBtn = document.createElement('button');
+        declineBtn.className = 'friend-secondary-btn';
+        declineBtn.textContent = 'Afvis';
+        declineBtn.addEventListener('click', () => declineFriendRequest(email));
+
+        container.appendChild(buildFriendItem(user, { actions: [acceptBtn, declineBtn] }));
+    });
+}
+
+async function renderFriendsList() {
+    const container = document.getElementById('friendsList');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const current = getCurrentUser();
+    if (!current || !current.email) return;
+    const friends = await getFriends(current.email);
+    const allUsers = await getAllUserProfiles();
+
+    if (friends.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'friends-empty';
+        empty.textContent = 'Du har ingen venner endnu.';
+        container.appendChild(empty);
+        return;
+    }
+
+    friends.forEach(email => {
+        const user = allUsers.find(u => u.email === email) || { name: email, email };
+        user.isFriend = true;
+        container.appendChild(buildFriendItem(user, { chip: 'Ven' }));
+    });
+}
+
+async function loadFriendsData() {
+    await renderSuggestions();
+    await renderRequests();
+    await renderFriendsList();
+    await renderSearchResults(document.getElementById('friendsSearchInput')?.value.trim().toLowerCase() || '');
+}
+
+async function saveSettings() {
+    const name = document.getElementById('settingsName').value.trim();
+    const email = document.getElementById('settingsEmail').value.trim();
+    const errorEl = document.getElementById('settingsError');
+    if (errorEl) errorEl.innerHTML = '';
+
+    if (isGuestUser()) {
+        if (errorEl) errorEl.innerHTML = '<p class="error-message">Gæster kan ikke ændre navn eller e-mail</p>';
+        return;
+    }
+
+    if (!name || !email) {
+        if (errorEl) errorEl.innerHTML = '<p class="error-message">Brugernavn og e-mail er påkrævet</p>';
+        return;
+    }
+
+    const currentUser = sessionStorage.getItem('currentUser');
+    if (!currentUser) {
+        if (errorEl) errorEl.innerHTML = '<p class="error-message">Du er ikke logget ind</p>';
+        return;
+    }
+
+    const user = JSON.parse(currentUser);
+    const oldEmail = user.email;
+
+    if (!user.isGuest) {
+        try {
+            await apiRequest(`/api/users/${encodeURIComponent(oldEmail)}`, {
+                method: 'PUT',
+                body: JSON.stringify({ name, email })
+            });
+        } catch (err) {
+            if (errorEl) errorEl.innerHTML = '<p class="error-message">Kunne ikke gemme ændringer</p>';
+            return;
+        }
+    }
+
+    const updatedUser = { ...user, name, email };
+    sessionStorage.setItem('currentUser', JSON.stringify(updatedUser));
+
+    const initials = name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+    setText('avatarInitials', initials);
+    setText('avatarName', name);
+    setText('displayUserName', name);
+    setText('displayUserEmail', email);
+
+    await refreshStoredEvents();
+    await loadFriendsData();
+
+    if (errorEl) errorEl.innerHTML = '<p class="success-message">Gemt</p>';
+}
+
+async function deleteAccount() {
+    const currentUser = sessionStorage.getItem('currentUser');
+    if (!currentUser) {
+        alert('Du er ikke logget ind.');
+        return;
+    }
+
+    const user = JSON.parse(currentUser);
+    if (!confirm('Er du sikker på, at du vil slette din konto? Dette kan ikke fortrydes.')) {
+        return;
+    }
+
+    if (!user.isGuest) {
+        try {
+            await apiRequest(`/api/users/${encodeURIComponent(user.email)}`, {
+                method: 'DELETE'
+            });
+        } catch (err) {
+            alert('Kunne ikke slette konto. Prøv igen.');
+            return;
+        }
+    }
+
+    handleLogout();
+    alert('Din konto er slettet.');
+}
+
+function openPolicy(type) {
+    if (type === 'privacy') {
+        alert('Privatlivspolitik kommer snart.');
+    } else {
+        alert('Vilkår og betingelser kommer snart.');
+    }
+}
+
+function getDateRangeIso() {
+    const start = new Date();
+    const end = new Date();
+    end.setMonth(end.getMonth() + 3);
+    const toTicketmasterIso = (date) => date.toISOString().replace(/\.\d{3}Z$/, 'Z');
+    return {
+        start: toTicketmasterIso(start),
+        end: toTicketmasterIso(end)
+    };
+}
+
+function formatEventDate(dateString) {
+    if (!dateString) return 'Dato TBA';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('da-DK', {
+        day: '2-digit',
+        month: 'short'
+    });
+}
+
+function getFallbackEvents() {
+    return [
+        { name: 'Roskilde Festival', city: 'Roskilde', date: 'Dato TBA', url: '#', price: 899, currency: 'DKK' },
+        { name: 'Tinderbox', city: 'Odense', date: 'Dato TBA', url: '#', price: 799, currency: 'DKK' },
+        { name: 'NorthSide', city: 'Aarhus', date: 'Dato TBA', url: '#', price: 699, currency: 'DKK' },
+        { name: 'Smukfest', city: 'Skanderborg', date: 'Dato TBA', url: '#', price: 849, currency: 'DKK' },
+        { name: 'Copenhagen Jazz Festival', city: 'København', date: 'Dato TBA', url: '#', price: 399, currency: 'DKK' }
+    ];
+}
+
+function updateEventsUI(events, options = {}) {
+    const top3 = document.getElementById('eventsTop3');
+    const list = document.getElementById('eventsList');
+
+    if (!top3 || !list) return;
+
+    top3.innerHTML = '';
+    list.innerHTML = '';
+
+    const topThree = events.slice(0, 3);
+    const medals = ['🥇', '🥈', '🥉'];
+    topThree.forEach((event, index) => {
+        const li = document.createElement('li');
+        const medal = medals[index] || '🏅';
+        li.innerHTML = `
+            <span class="rank">${medal} ${index + 1}.</span>
+            <span class="event-title">${event.name}</span>
+            <span class="event-city">${event.city}</span>
+        `;
+        top3.appendChild(li);
+    });
+
+    events.slice(0, 50).forEach(event => {
+        const li = document.createElement('li');
+        const row = document.createElement('div');
+        row.className = 'event-row';
+
+        const main = document.createElement('div');
+        main.className = 'event-main';
+
+        const link = document.createElement('a');
+        link.href = event.url;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.textContent = event.name;
+
+        const meta = document.createElement('span');
+        const priceText = event.price ? ` · ${formatPrice(event.price, event.currency)}` : '';
+        meta.textContent = `${event.city} · ${event.date}${priceText}`;
+
+        main.appendChild(link);
+        main.appendChild(meta);
+
+        const actions = document.createElement('div');
+        actions.className = 'event-actions';
+
+        const interestedBtn = document.createElement('button');
+        interestedBtn.className = 'event-action-btn event-action-interested';
+        if (isEventStored('interested', event)) {
+            interestedBtn.classList.add('active');
+            interestedBtn.textContent = 'Interesseret ✔';
+        } else {
+            interestedBtn.textContent = 'Interesseret';
+        }
+        interestedBtn.addEventListener('click', async () => {
+            await toggleEventStored('interested', event);
+            updateEventsUI(events);
+        });
+
+        const attendBtn = document.createElement('button');
+        attendBtn.className = 'event-action-btn event-action-attend';
+        if (isEventStored('attending', event)) {
+            attendBtn.classList.add('active');
+            attendBtn.textContent = 'Deltager ✔';
+        } else {
+            attendBtn.textContent = 'Deltager';
+        }
+        attendBtn.addEventListener('click', async () => {
+            const wasStored = isEventStored('attending', event);
+            if (!wasStored) {
+                if (event.url && event.url !== '#') {
+                    window.location.assign(event.url);
+                } else {
+                    addNotification('Ticketmaster-link mangler for denne begivenhed.');
+                }
+            }
+            await toggleEventStored('attending', event);
+            if (!wasStored) {
+                awardPurchaseRewards(event.price, event);
+            }
+            updateEventsUI(events);
+        });
+
+        actions.appendChild(interestedBtn);
+        actions.appendChild(attendBtn);
+
+        row.appendChild(main);
+        row.appendChild(actions);
+        li.appendChild(row);
+        list.appendChild(li);
+    });
+}
+
+function updateAllEventsUI(events) {
+    const list = document.getElementById('allEventsList');
+    if (!list) return;
+    list.innerHTML = '';
+
+    events.slice(0, 100).forEach(event => {
+        const li = document.createElement('li');
+        const row = document.createElement('div');
+        row.className = 'event-row';
+
+        const main = document.createElement('div');
+        main.className = 'event-main';
+
+        const link = document.createElement('a');
+        link.href = event.url;
+        link.target = '_blank';
+        link.rel = 'noopener';
+        link.textContent = event.name;
+
+        const meta = document.createElement('span');
+        const priceText = event.price ? ` · ${formatPrice(event.price, event.currency)}` : '';
+        meta.textContent = `${event.city} · ${event.date}${priceText}`;
+
+        main.appendChild(link);
+        main.appendChild(meta);
+
+        const actions = document.createElement('div');
+        actions.className = 'event-actions';
+
+        const interestedBtn = document.createElement('button');
+        interestedBtn.className = 'event-action-btn event-action-interested';
+        if (isEventStored('interested', event)) {
+            interestedBtn.classList.add('active');
+            interestedBtn.textContent = 'Interesseret ✔';
+        } else {
+            interestedBtn.textContent = 'Interesseret';
+        }
+        interestedBtn.addEventListener('click', async () => {
+            await toggleEventStored('interested', event);
+            updateAllEventsUI(events);
+        });
+
+        const attendBtn = document.createElement('button');
+        attendBtn.className = 'event-action-btn event-action-attend';
+        if (isEventStored('attending', event)) {
+            attendBtn.classList.add('active');
+            attendBtn.textContent = 'Deltager ✔';
+        } else {
+            attendBtn.textContent = 'Deltager';
+        }
+        attendBtn.addEventListener('click', async () => {
+            const wasStored = isEventStored('attending', event);
+            if (!wasStored) {
+                if (event.url && event.url !== '#') {
+                    window.location.assign(event.url);
+                } else {
+                    addNotification('Ticketmaster-link mangler for denne begivenhed.');
+                }
+            }
+            await toggleEventStored('attending', event);
+            if (!wasStored) {
+                awardPurchaseRewards(event.price, event);
+            }
+            updateAllEventsUI(events);
+        });
+
+        actions.appendChild(interestedBtn);
+        actions.appendChild(attendBtn);
+
+        row.appendChild(main);
+        row.appendChild(actions);
+        li.appendChild(row);
+        list.appendChild(li);
+    });
+}
+
+async function loadEvents() {
+    const top3 = document.getElementById('eventsTop3');
+    const list = document.getElementById('eventsList');
+
+    const range = getDateRangeIso();
+    const url = buildTicketmasterUrl({
+        countryCode: 'DK',
+        size: '50',
+        sort: 'date,asc',
+        startDateTime: range.start,
+        endDateTime: range.end,
+        locale: '*'
+    });
+
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (!response.ok) {
+            updateEventsUI(getFallbackEvents());
+            return;
+        }
+        const items = data?._embedded?.events || [];
+
+        const events = items.map(item => {
+            const city = item._embedded?.venues?.[0]?.city?.name || 'Danmark';
+            const rawDate = item.dates?.start?.dateTime || item.dates?.start?.localDate || '';
+            const date = formatEventDate(rawDate);
+            const priceRange = item.priceRanges?.[0] || {};
+            const price = typeof priceRange.min === 'number' ? priceRange.min : (typeof priceRange.max === 'number' ? priceRange.max : null);
+            return {
+                id: item.id,
+                name: item.name,
+                city,
+                date,
+                rawDate,
+                url: item.url || '#',
+                price,
+                currency: priceRange.currency || 'DKK'
+            };
+        });
+
+        if (events.length === 0) {
+            updateEventsUI(getFallbackEvents());
+            return;
+        }
+
+        updateEventsUI(events);
+    } catch (error) {
+        updateEventsUI(getFallbackEvents());
+    }
+}
+
+async function loadAllEvents() {
+    const list = document.getElementById('allEventsList');
+    const range = getDateRangeIso();
+    const url = buildTicketmasterUrl({
+        countryCode: 'DK',
+        size: '100',
+        startDateTime: range.start,
+        endDateTime: range.end,
+        locale: '*'
+    });
+
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (!response.ok) {
+            updateAllEventsUI(getFallbackEvents());
+            return;
+        }
+
+        const items = data?._embedded?.events || [];
+        const events = items.map(item => {
+            const city = item._embedded?.venues?.[0]?.city?.name || 'Danmark';
+            const rawDate = item.dates?.start?.dateTime || item.dates?.start?.localDate || '';
+            const date = formatEventDate(rawDate);
+            const priceRange = item.priceRanges?.[0] || {};
+            const price = typeof priceRange.min === 'number' ? priceRange.min : (typeof priceRange.max === 'number' ? priceRange.max : null);
+            return {
+                id: item.id,
+                name: item.name,
+                city,
+                date,
+                rawDate,
+                url: item.url || '#',
+                price,
+                currency: priceRange.currency || 'DKK'
+            };
+        });
+
+        events.sort((a, b) => {
+            const aTime = a.rawDate ? new Date(a.rawDate).getTime() : Number.POSITIVE_INFINITY;
+            const bTime = b.rawDate ? new Date(b.rawDate).getTime() : Number.POSITIVE_INFINITY;
+            return aTime - bTime;
+        });
+
+        if (events.length === 0) {
+            updateAllEventsUI(getFallbackEvents());
+            return;
+        }
+
+        updateAllEventsUI(events);
+    } catch (error) {
+        updateAllEventsUI(getFallbackEvents());
+    }
+}
+
+function openFullscreenMap() {
+    const map = document.getElementById('fullscreenMap');
+    if (map) map.classList.add('show');
+}
+
+function closeFullscreenMap() {
+    const map = document.getElementById('fullscreenMap');
+    if (map) map.classList.remove('show');
+}
+
+// Simuleret database af brugere (gemmes nu i backend)
+function initializeDatabase() {}
+
+function toggleForm() {
+    document.getElementById('loginForm').classList.toggle('hidden');
+    document.getElementById('registerForm').classList.toggle('hidden');
+    clearErrors();
+}
+
+function clearErrors() {
+    const loginError = document.getElementById('loginError');
+    if (loginError) loginError.innerHTML = '';
+    document.getElementById('registerError').innerHTML = '';
+}
+
+async function handleRegister() {
+    const name = document.getElementById('regName').value.trim();
+    const email = document.getElementById('regEmail').value.trim();
+    const password = document.getElementById('regPassword').value;
+    const confirmPassword = document.getElementById('regConfirmPassword').value;
+    const errorDiv = document.getElementById('registerError');
+
+    clearErrors();
+
+    if (!name) {
+        errorDiv.innerHTML = '<p class="error-message">Navn er påkrævet</p>';
+        return;
+    }
+
+    if (!email) {
+        errorDiv.innerHTML = '<p class="error-message">E-mail er påkrævet</p>';
+        return;
+    }
+
+    if (!password || !confirmPassword) {
+        errorDiv.innerHTML = '<p class="error-message">Adgangskode er påkrævet</p>';
+        return;
+    }
+
+    if (password !== confirmPassword) {
+        errorDiv.innerHTML = '<p class="error-message">Adgangskoderne stemmer ikke overens</p>';
+        return;
+    }
+
+    if (password.length < 6) {
+        errorDiv.innerHTML = '<p class="error-message">Adgangskoden skal være mindst 6 tegn</p>';
+        return;
+    }
+
+    try {
+        await apiRequest('/api/users/register', {
+            method: 'POST',
+            body: JSON.stringify({ name, email, password })
+        });
+
+        errorDiv.innerHTML = '<p class="success-message">Profil oprettet! Du kan nu logge ind</p>';
+    } catch (err) {
+        errorDiv.innerHTML = '<p class="error-message">Denne e-mail er allerede registreret</p>';
+        return;
+    }
+    
+    setTimeout(() => {
+        toggleForm();
+        const loginEmail = document.getElementById('loginEmail');
+        if (loginEmail) loginEmail.value = email;
+        document.getElementById('regName').value = '';
+        document.getElementById('regEmail').value = '';
+        document.getElementById('regPassword').value = '';
+        document.getElementById('regConfirmPassword').value = '';
+    }, 1500);
+}
+
+async function handleLogin() {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const errorDiv = document.getElementById('loginError');
+
+    clearErrors();
+
+    if (!email || !password) {
+        errorDiv.innerHTML = '<p class="error-message">E-mail og adgangskode er påkrævet</p>';
+        return;
+    }
+
+    try {
+        const user = await apiRequest('/api/users/login', {
+            method: 'POST',
+            body: JSON.stringify({ email, password })
+        });
+        await loginUser(user.name, user.email, false, { skipServerLogin: true });
+    } catch (err) {
+        errorDiv.innerHTML = '<p class="error-message">Forkert e-mail eller adgangskode</p>';
+    }
+}
+
+function handleGuestLogin() {
+    loginUser('Gæst', 'gæst@eksempel.dk', true);
+}
+
+function handleMitIDLogin() {
+    document.getElementById('mitidModal').classList.add('show');
+    document.getElementById('mitidForm').classList.remove('hidden');
+    document.getElementById('mitidRegister').classList.add('hidden');
+    document.getElementById('mitidLoading').classList.remove('show');
+    document.getElementById('mitidError').innerHTML = '';
+    document.getElementById('mitidRegisterError').innerHTML = '';
+    document.getElementById('mitidInput').focus();
+}
+
+function closeMitIDModal() {
+    document.getElementById('mitidModal').classList.remove('show');
+    document.getElementById('mitidForm').classList.remove('hidden');
+    document.getElementById('mitidRegister').classList.add('hidden');
+    document.getElementById('mitidLoading').classList.remove('show');
+    document.getElementById('mitidInput').value = '';
+    document.getElementById('mitidRegName').value = '';
+    document.getElementById('mitidRegEmail').value = '';
+    document.getElementById('mitidError').innerHTML = '';
+    document.getElementById('mitidRegisterError').innerHTML = '';
+    pendingMitidCpr = null;
+}
+
+function backToMitIDLogin() {
+    document.getElementById('mitidRegister').classList.add('hidden');
+    document.getElementById('mitidForm').classList.remove('hidden');
+    document.getElementById('mitidRegisterError').innerHTML = '';
+    document.getElementById('mitidInput').focus();
+}
+
+async function confirmMitIDLogin() {
+    const cprNumber = document.getElementById('mitidInput').value.trim();
+    const errorEl = document.getElementById('mitidError');
+    if (errorEl) errorEl.innerHTML = '';
+    
+    if (!cprNumber) {
+        if (errorEl) errorEl.innerHTML = '<p class="error-message">Angiv venligst dit CPR-nummer</p>';
+        return;
+    }
+
+    if (!/^\d{6}-\d{4}$/.test(cprNumber)) {
+        if (errorEl) errorEl.innerHTML = '<p class="error-message">Ugyldigt CPR-format. Brug formatet: DDMMYY-XXXX</p>';
+        return;
+    }
+
+    try {
+        const user = await apiRequest(`/api/mitid/${encodeURIComponent(cprNumber)}`);
+        await loginUser(user.name, user.email, false, { skipServerLogin: true });
+        closeMitIDModal();
+        return;
+    } catch (err) {
+        // continue to registration step
+    }
+
+    pendingMitidCpr = cprNumber;
+    document.getElementById('mitidForm').classList.add('hidden');
+    document.getElementById('mitidRegister').classList.remove('hidden');
+    document.getElementById('mitidRegName').focus();
+}
+
+async function confirmMitIDRegister() {
+    const name = document.getElementById('mitidRegName').value.trim();
+    const email = document.getElementById('mitidRegEmail').value.trim();
+    const errorEl = document.getElementById('mitidRegisterError');
+    if (errorEl) errorEl.innerHTML = '';
+
+    if (!pendingMitidCpr) {
+        if (errorEl) errorEl.innerHTML = '<p class="error-message">CPR-nummer mangler. Prøv igen.</p>';
+        return;
+    }
+
+    if (!name) {
+        if (errorEl) errorEl.innerHTML = '<p class="error-message">Brugernavn er påkrævet</p>';
+        return;
+    }
+
+    if (!email) {
+        if (errorEl) errorEl.innerHTML = '<p class="error-message">E-mail er påkrævet</p>';
+        return;
+    }
+
+    try {
+        const user = await apiRequest('/api/mitid/register', {
+            method: 'POST',
+            body: JSON.stringify({ name, email, cpr: pendingMitidCpr })
+        });
+        await loginUser(user.name, user.email, false, { skipServerLogin: true });
+        closeMitIDModal();
+    } catch (err) {
+        if (errorEl) errorEl.innerHTML = '<p class="error-message">Kunne ikke oprette MitID bruger</p>';
+    }
+}
+
+// Allow Enter key to submit
+document.addEventListener('DOMContentLoaded', function() {
+    const mitidInput = document.getElementById('mitidInput');
+    if (mitidInput) {
+        mitidInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                confirmMitIDLogin();
+            }
+        });
+    }
+
+    const chatInput = document.getElementById('chatInput');
+    if (chatInput) {
+        chatInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendChatMessage();
+            }
+        });
+    }
+
+    initPointShop();
+    updateStatsUI();
+    renderNotifications();
+});
+
+window.addEventListener('resize', () => {
+    resizeAvatarCanvas();
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    const mapFloat = document.getElementById('mapFloat');
+    if (!mapFloat) return;
+
+    let isDragging = false;
+    let moved = false;
+    let startX = 0;
+    let startY = 0;
+    let startLeft = 0;
+    let startTop = 0;
+    let dragReady = false;
+    let dragTimer = null;
+    const dragDelay = 200;
+    const dragThreshold = 6;
+
+    const onPointerMove = (e) => {
+        if (!dragReady) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        if (!moved && Math.abs(dx) < dragThreshold && Math.abs(dy) < dragThreshold) return;
+        moved = true;
+
+        const newLeft = startLeft + dx;
+        const newTop = startTop + dy;
+
+        mapFloat.style.left = `${newLeft}px`;
+        mapFloat.style.top = `${newTop}px`;
+        mapFloat.style.right = 'auto';
+        mapFloat.style.bottom = 'auto';
+    };
+
+    const onPointerUp = () => {
+        if (dragTimer) {
+            clearTimeout(dragTimer);
+            dragTimer = null;
+        }
+        if (!dragReady) {
+            moved = false;
+            return;
+        }
+        dragReady = false;
+        isDragging = false;
+        mapFloat.classList.remove('dragging');
+        if (!moved) {
+            mapFloat.style.left = '';
+            mapFloat.style.top = '';
+            mapFloat.style.right = '';
+            mapFloat.style.bottom = '';
+        }
+        mapFloat.releasePointerCapture?.(mapFloat.pointerId);
+        document.removeEventListener('pointermove', onPointerMove);
+        document.removeEventListener('pointerup', onPointerUp);
+    };
+
+    mapFloat.addEventListener('pointerdown', (e) => {
+        moved = false;
+        dragReady = false;
+        isDragging = true;
+        mapFloat.setPointerCapture?.(e.pointerId);
+
+        const rect = mapFloat.getBoundingClientRect();
+        startX = e.clientX;
+        startY = e.clientY;
+        startLeft = rect.left;
+        startTop = rect.top;
+
+        dragTimer = setTimeout(() => {
+            dragReady = true;
+            mapFloat.classList.add('dragging');
+        }, dragDelay);
+
+        document.addEventListener('pointermove', onPointerMove);
+        document.addEventListener('pointerup', onPointerUp);
+    });
+
+    mapFloat.addEventListener('click', (e) => {
+        if (moved) {
+            e.preventDefault();
+            e.stopPropagation();
+            return;
+        }
+        openFullscreenMap();
+    });
+});
+
+async function loginUser(name, email, isGuest, options = {}) {
+    sessionStorage.setItem('currentUser', JSON.stringify({ name, email, isGuest }));
+    if (!isGuest && !options.skipServerLogin) {
+        await apiRequest('/api/users/login', {
+            method: 'POST',
+            body: JSON.stringify({ name, email })
+        });
+    }
+    if (isGuest) {
+        guestStats = { xp: 0, level: 1, points: 0 };
+        guestNotifications = [];
+        guestChats = {};
+    }
+    await showDashboard(name, email, isGuest);
+}
+
+async function showDashboard(name, email, isGuest) {
+    const container = document.querySelector('.container');
+    if (container) container.classList.add('hidden');
+    setHidden('loginForm', true);
+    setHidden('registerForm', true);
+    setHidden('dashboard', true);
+    setHidden('menu', false);
+    setHidden('profilePage', true);
+    setHidden('eventsPage', true);
+    setHidden('allEventsPage', true);
+    setHidden('settingsPage', true);
+    setHidden('friendsPage', true);
+    setHidden('pointShopPage', true);
+    setHidden('notificationsPage', true);
+    setHidden('chatPage', true);
+    setHidden('footerMenu', false);
+    updateUserUI({ name, email, isGuest });
+    
+    // Update avatar with user initials
+    // Load saved appearance and init preview
+    await loadAvatarAppearance();
+    setTimeout(() => {
+        initAvatarPreview();
+    }, 100);
+
+    updateStatsUI();
+    renderNotifications();
+
+    await refreshStoredEvents();
+    await loadEvents();
+    await updateUserLocation();
+}
+
+function handleProfile() {
+    openProfilePage();
+}
+
+function handleSettings() {
+    openSettingsPage();
+}
+
+function handleLogout() {
+    sessionStorage.removeItem('currentUser');
+    guestStats = { xp: 0, level: 1, points: 0 };
+    guestNotifications = [];
+    guestChats = {};
+
+    if (getCurrentPage() !== 'home') {
+        navigateTo('/');
+        return;
+    }
+
+    const container = document.querySelector('.container');
+    if (container) container.classList.remove('hidden');
+    setHidden('loginForm', false);
+    setHidden('menu', true);
+    setHidden('eventsPage', true);
+    setHidden('allEventsPage', true);
+    setHidden('settingsPage', true);
+    setHidden('friendsPage', true);
+    setHidden('footerMenu', true);
+    setHidden('pointShopPage', true);
+    setHidden('notificationsPage', true);
+    setHidden('chatPage', true);
+    const loginEmail = document.getElementById('loginEmail');
+    const loginPassword = document.getElementById('loginPassword');
+    if (loginEmail) loginEmail.value = '';
+    if (loginPassword) loginPassword.value = '';
+    clearErrors();
+    updateStatsUI({ xp: 0, level: 1, points: 0 });
+}
+
+async function checkLogin() {
+    const currentUser = sessionStorage.getItem('currentUser');
+    if (!currentUser) {
+        if (getCurrentPage() !== 'home') {
+            navigateTo('/');
+        }
+        return;
+    }
+
+    const user = JSON.parse(currentUser);
+    if (getCurrentPage() === 'home') {
+        await showDashboard(user.name, user.email, user.isGuest);
+        return;
+    }
+
+    await applyUserToPage(user);
+}
+
+async function applyUserToPage(user) {
+    updateUserUI(user);
+    updateStatsUI();
+    renderNotifications();
+    await refreshStoredEvents();
+
+    const page = getCurrentPage();
+    if (page === 'friends' && user.isGuest) {
+        addNotification('Gæster har ikke adgang til venner.');
+        navigateTo('/');
+        return;
+    }
+
+    if (page === 'profile') {
+        await loadAvatarAppearance();
+        setTimeout(() => {
+            initAvatarScene();
+        }, 100);
+        return;
+    }
+
+    if (page === 'events') {
+        await loadEvents();
+        return;
+    }
+
+    if (page === 'all-events') {
+        await loadAllEvents();
+        return;
+    }
+
+    if (page === 'settings') {
+        prepareSettingsPage(user);
+        return;
+    }
+
+    if (page === 'friends') {
+        await loadFriendsData();
+        await updateUserLocation();
+        return;
+    }
+
+    if (page === 'pointshop') {
+        initPointShop();
+        switchShopTab('points');
+        return;
+    }
+
+    if (page === 'notifications') {
+        renderNotifications();
+        return;
+    }
+
+    if (page === 'chat') {
+        await loadChatContacts();
+    }
+}
+
+// Initialisering
+initializeDatabase();
+checkLogin();

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Point Shop</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body data-page="pointshop">
+    <video class="video-bg" autoplay muted loop playsinline>
+        <source src="../assets/ConcertVideo.mp4" type="video/mp4">
+    </video>
+
+    <div id="pointShopPage" class="pointshop-page">
+        <div class="pointshop-header">
+            <button onclick="closePointShop()">← Tilbage</button>
+            <h2 style="flex: 1; text-align: center; margin: 0; color: white;">Point Shop</h2>
+            <div class="points-badge">🪙 <span id="shopPoints">0</span></div>
+        </div>
+
+        <div class="pointshop-tabs">
+            <button class="shop-tab active" data-shop-tab="points" onclick="switchShopTab('points')">Point items</button>
+            <button class="shop-tab" data-shop-tab="dkk" onclick="switchShopTab('dkk')">Køb for DKK</button>
+        </div>
+
+        <div class="pointshop-content">
+            <div id="shopPointsGrid" class="shop-grid"></div>
+            <div id="shopDkkGrid" class="shop-grid hidden"></div>
+        </div>
+    </div>
+
+    <div id="footerMenu" class="footer-menu">
+        <button type="button" id="footerFriendsBtn" aria-label="Venner" title="Venner" onclick="openFriendsPage()">👥</button>
+        <button type="button" aria-label="Point Shop" title="Point Shop" onclick="openPointShop()">💎</button>
+        <button type="button" class="footer-home" aria-label="Home" title="Home" onclick="goHome()">🏠</button>
+        <button type="button" aria-label="Notifications" title="Notifications" onclick="openNotificationsPage()">🔔</button>
+        <button type="button" aria-label="Privat beskeder" title="Privat beskeder" onclick="openChatPage()">💬</button>
+    </div>
+
+    <script src="../app.js"></script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Venner</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body data-page="friends">
+    <video class="video-bg" autoplay muted loop playsinline>
+        <source src="../assets/ConcertVideo.mp4" type="video/mp4">
+    </video>
+
+    <div id="friendsPage" class="friends-page">
+        <div class="friends-header">
+            <button onclick="closeFriendsPage()">← Tilbage</button>
+            <h2 style="flex: 1; text-align: center; margin: 0; color: white;">Venner</h2>
+        </div>
+
+        <div class="friends-card">
+            <h3>Søg efter venner</h3>
+            <div class="friends-search">
+                <input type="text" id="friendsSearchInput" placeholder="Søg på navn eller e-mail" oninput="handleFriendSearch()">
+            </div>
+            <div class="friends-list" id="friendsSearchResults"></div>
+        </div>
+
+        <div class="friends-card">
+            <h3>Venneforslag i nærheden</h3>
+            <p id="friendsLocationStatus" class="friends-empty"></p>
+            <div class="friends-list" id="friendsSuggestions"></div>
+        </div>
+
+        <div class="friends-card">
+            <h3>Anmodninger</h3>
+            <div class="friends-list" id="friendsRequests"></div>
+        </div>
+
+        <div class="friends-card">
+            <h3>Dine venner</h3>
+            <div class="friends-list" id="friendsList"></div>
+        </div>
+    </div>
+
+    <div id="friendModal" class="friend-modal">
+        <div class="friend-modal-content">
+            <div class="friend-modal-header">
+                <h3 id="friendModalName">Profil</h3>
+                <button onclick="closeFriendModal()">Luk</button>
+            </div>
+            <div class="friend-modal-info" id="friendModalInfo"></div>
+        </div>
+    </div>
+
+    <div id="footerMenu" class="footer-menu">
+        <button type="button" id="footerFriendsBtn" aria-label="Venner" title="Venner" onclick="openFriendsPage()">👥</button>
+        <button type="button" aria-label="Point Shop" title="Point Shop" onclick="openPointShop()">💎</button>
+        <button type="button" class="footer-home" aria-label="Home" title="Home" onclick="goHome()">🏠</button>
+        <button type="button" aria-label="Notifications" title="Notifications" onclick="openNotificationsPage()">🔔</button>
+        <button type="button" aria-label="Privat beskeder" title="Privat beskeder" onclick="openChatPage()">💬</button>
+    </div>
+
+    <script src="../app.js"></script>
+</body>
+</html>

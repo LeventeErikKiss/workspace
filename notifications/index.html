@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notifikationer</title>
+    <link rel="stylesheet" href="../styles.css">
+</head>
+<body data-page="notifications">
+    <video class="video-bg" autoplay muted loop playsinline>
+        <source src="../assets/ConcertVideo.mp4" type="video/mp4">
+    </video>
+
+    <div id="notificationsPage" class="notifications-page">
+        <div class="notifications-header">
+            <button onclick="closeNotificationsPage()">← Tilbage</button>
+            <h2 style="flex: 1; text-align: center; margin: 0; color: white;">Notifikationer</h2>
+        </div>
+        <div class="notifications-card">
+            <ul id="notificationsList" class="notifications-list"></ul>
+        </div>
+    </div>
+
+    <div id="footerMenu" class="footer-menu">
+        <button type="button" id="footerFriendsBtn" aria-label="Venner" title="Venner" onclick="openFriendsPage()">👥</button>
+        <button type="button" aria-label="Point Shop" title="Point Shop" onclick="openPointShop()">💎</button>
+        <button type="button" class="footer-home" aria-label="Home" title="Home" onclick="goHome()">🏠</button>
+        <button type="button" aria-label="Notifications" title="Notifications" onclick="openNotificationsPage()">🔔</button>
+        <button type="button" aria-label="Privat beskeder" title="Privat beskeder" onclick="openChatPage()">💬</button>
+    </div>
+
+    <script src="../app.js"></script>
+</body>
+</html>
