@@ -136,7 +136,7 @@ app.post('/api/admin/login', (req, res) => {
 
 app.get('/api/admin/users', requireAdmin, async (req, res) => {
   try {
-    const rows = await all('SELECT email, name, createdAt FROM users ORDER BY createdAt DESC');
+    const rows = await all('SELECT email, name, createdAt, isPremium FROM users ORDER BY createdAt DESC');
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: 'admin users read failed' });
@@ -156,15 +156,48 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
     if (existing) return res.status(409).json({ error: 'email exists' });
 
     const hashed = password ? await bcrypt.hash(password, 10) : null;
-    await run('INSERT INTO users (email, name, password, createdAt) VALUES (?, ?, ?, ?)', [
+    await run('INSERT INTO users (email, name, password, createdAt, isPremium) VALUES (?, ?, ?, ?, ?)', [
       email,
       name,
       hashed,
-      nowIso()
+      nowIso(),
+      0
     ]);
     res.json({ email, name });
   } catch (err) {
     res.status(500).json({ error: 'admin user create failed' });
+  }
+});
+
+app.post('/api/admin/premium', requireAdmin, async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const isPremium = Boolean(req.body?.isPremium);
+    if (!email) return res.status(400).json({ error: 'email required' });
+    await run('UPDATE users SET isPremium = ? WHERE email = ?', [isPremium ? 1 : 0, email]);
+    const user = await get('SELECT email, name, createdAt, isPremium FROM users WHERE email = ?', [email]);
+    if (!user) return res.status(404).json({ error: 'not found' });
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: 'premium update failed' });
+  }
+});
+
+app.post('/api/admin/items', requireAdmin, async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const itemName = String(req.body?.itemName || '').trim();
+    const source = String(req.body?.source || 'admin');
+    if (!email || !itemName) return res.status(400).json({ error: 'email and itemName required' });
+    await run('INSERT INTO items (email, itemName, source, createdAt) VALUES (?, ?, ?, ?)', [
+      email,
+      itemName,
+      source,
+      nowIso()
+    ]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'item grant failed' });
   }
 });
 
@@ -177,6 +210,8 @@ app.delete('/api/admin/users/:email', requireAdmin, async (req, res) => {
     await run('DELETE FROM requests WHERE email = ? OR fromEmail = ?', [email, email]);
     await run('DELETE FROM events WHERE email = ?', [email]);
     await run('DELETE FROM locations WHERE email = ?', [email]);
+    await run('DELETE FROM items WHERE email = ?', [email]);
+    await run('DELETE FROM chats WHERE fromEmail = ? OR toEmail = ?', [email, email]);
     await run('DELETE FROM users WHERE email = ?', [email]);
     await run('COMMIT');
     res.json({ ok: true });
@@ -199,11 +234,12 @@ app.post('/api/users/register', async (req, res) => {
     if (existing) return res.status(409).json({ error: 'email exists' });
 
     const hashed = await bcrypt.hash(password, 10);
-    await run('INSERT INTO users (email, name, password, createdAt) VALUES (?, ?, ?, ?)', [
+    await run('INSERT INTO users (email, name, password, createdAt, isPremium) VALUES (?, ?, ?, ?, ?)', [
       email,
       name,
       hashed,
-      nowIso()
+      nowIso(),
+      0
     ]);
     res.json({ email, name });
   } catch (err) {
@@ -262,7 +298,7 @@ app.post('/api/mitid/register', async (req, res) => {
 app.get('/api/users/:email', async (req, res) => {
   try {
     const email = normalizeEmail(req.params.email);
-    const user = await get('SELECT email, name, createdAt FROM users WHERE email = ?', [email]);
+    const user = await get('SELECT email, name, createdAt, isPremium FROM users WHERE email = ?', [email]);
     if (!user) return res.status(404).json({ error: 'not found' });
     res.json(user);
   } catch (err) {
@@ -272,7 +308,7 @@ app.get('/api/users/:email', async (req, res) => {
 
 app.get('/api/users', async (req, res) => {
   try {
-    const rows = await all('SELECT email, name, createdAt FROM users ORDER BY name ASC');
+    const rows = await all('SELECT email, name, createdAt, isPremium FROM users ORDER BY name ASC');
     res.json(rows);
   } catch (err) {
     res.status(500).json({ error: 'users read failed' });
@@ -307,7 +343,7 @@ app.put('/api/users/:email', async (req, res) => {
       await run('UPDATE users SET name = ? WHERE email = ?', [name, oldEmail]);
     }
 
-    const user = await get('SELECT email, name, createdAt FROM users WHERE email = ?', [newEmail]);
+    const user = await get('SELECT email, name, createdAt, isPremium FROM users WHERE email = ?', [newEmail]);
     res.json(user);
   } catch (err) {
     await run('ROLLBACK').catch(() => null);
@@ -324,6 +360,8 @@ app.delete('/api/users/:email', async (req, res) => {
     await run('DELETE FROM requests WHERE email = ? OR fromEmail = ?', [email, email]);
     await run('DELETE FROM events WHERE email = ?', [email]);
     await run('DELETE FROM locations WHERE email = ?', [email]);
+    await run('DELETE FROM items WHERE email = ?', [email]);
+    await run('DELETE FROM chats WHERE fromEmail = ? OR toEmail = ?', [email, email]);
     await run('DELETE FROM users WHERE email = ?', [email]);
     await run('COMMIT');
     res.json({ ok: true });
@@ -402,6 +440,49 @@ app.get('/api/requests/:email', async (req, res) => {
     res.json(rows.map(r => r.fromEmail));
   } catch (err) {
     res.status(500).json({ error: 'requests read failed' });
+  }
+});
+
+app.get('/api/items/:email', async (req, res) => {
+  try {
+    const email = normalizeEmail(req.params.email);
+    const rows = await all('SELECT itemName, source, createdAt FROM items WHERE email = ? ORDER BY createdAt DESC', [email]);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'items read failed' });
+  }
+});
+
+app.get('/api/chats/:email', async (req, res) => {
+  try {
+    const email = normalizeEmail(req.params.email);
+    const withEmail = normalizeEmail(req.query.with);
+    if (!email || !withEmail) return res.status(400).json({ error: 'email and with required' });
+    const rows = await all(
+      'SELECT fromEmail, toEmail, message, createdAt FROM chats WHERE (fromEmail = ? AND toEmail = ?) OR (fromEmail = ? AND toEmail = ?) ORDER BY createdAt ASC LIMIT 200',
+      [email, withEmail, withEmail, email]
+    );
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: 'chat read failed' });
+  }
+});
+
+app.post('/api/chats/:email', async (req, res) => {
+  try {
+    const email = normalizeEmail(req.params.email);
+    const toEmail = normalizeEmail(req.body?.to);
+    const message = String(req.body?.message || '').trim();
+    if (!email || !toEmail || !message) return res.status(400).json({ error: 'to and message required' });
+    await run('INSERT INTO chats (fromEmail, toEmail, message, createdAt) VALUES (?, ?, ?, ?)', [
+      email,
+      toEmail,
+      message,
+      nowIso()
+    ]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'chat send failed' });
   }
 });
 

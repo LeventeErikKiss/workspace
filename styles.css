@@ -1009,6 +1009,19 @@ h3 {
     gap: 8px;
 }
 
+.admin-premium-btn {
+    width: auto;
+    padding: 8px 14px;
+    background-color: #2BC4A9;
+    border-radius: 6px;
+    font-size: 13px;
+    color: #fff;
+}
+
+.admin-premium-btn:hover {
+    background-color: #1f9ea6;
+}
+
 .admin-delete-btn {
     width: auto;
     padding: 8px 14px;

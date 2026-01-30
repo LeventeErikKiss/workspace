@@ -117,9 +117,12 @@ async function init() {
         email TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         password TEXT,
-        createdAt TEXT NOT NULL
+        createdAt TEXT NOT NULL,
+        isPremium BOOLEAN DEFAULT FALSE
       )`
     );
+
+    await run('ALTER TABLE users ADD COLUMN IF NOT EXISTS isPremium BOOLEAN DEFAULT FALSE');
 
     await run(
       `CREATE TABLE IF NOT EXISTS avatars (
@@ -161,6 +164,26 @@ async function init() {
     );
 
     await run(
+      `CREATE TABLE IF NOT EXISTS items (
+        id SERIAL PRIMARY KEY,
+        email TEXT NOT NULL,
+        itemName TEXT NOT NULL,
+        source TEXT,
+        createdAt TEXT NOT NULL
+      )`
+    );
+
+    await run(
+      `CREATE TABLE IF NOT EXISTS chats (
+        id SERIAL PRIMARY KEY,
+        fromEmail TEXT NOT NULL,
+        toEmail TEXT NOT NULL,
+        message TEXT NOT NULL,
+        createdAt TEXT NOT NULL
+      )`
+    );
+
+    await run(
       `CREATE TABLE IF NOT EXISTS locations (
         email TEXT PRIMARY KEY,
         lat DOUBLE PRECISION NOT NULL,
@@ -184,7 +207,8 @@ async function init() {
       email TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       password TEXT,
-      createdAt TEXT NOT NULL
+      createdAt TEXT NOT NULL,
+      isPremium INTEGER DEFAULT 0
     )`
   );
 
@@ -193,8 +217,13 @@ async function init() {
   if (!hasPassword) {
     await run('ALTER TABLE users ADD COLUMN password TEXT');
   }
+  const hasPremium = userColumns.some(col => col.name === 'isPremium');
+  if (!hasPremium) {
+    await run('ALTER TABLE users ADD COLUMN isPremium INTEGER DEFAULT 0');
+  }
 
   await run('ALTER TABLE users ADD COLUMN password TEXT').catch(() => null);
+  await run('ALTER TABLE users ADD COLUMN isPremium INTEGER DEFAULT 0').catch(() => null);
 
   await run(
     `CREATE TABLE IF NOT EXISTS avatars (
@@ -233,6 +262,26 @@ async function init() {
       url TEXT,
       createdAt TEXT NOT NULL,
       PRIMARY KEY (email, eventId, type)
+    )`
+  );
+
+  await run(
+    `CREATE TABLE IF NOT EXISTS items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL,
+      itemName TEXT NOT NULL,
+      source TEXT,
+      createdAt TEXT NOT NULL
+    )`
+  );
+
+  await run(
+    `CREATE TABLE IF NOT EXISTS chats (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      fromEmail TEXT NOT NULL,
+      toEmail TEXT NOT NULL,
+      message TEXT NOT NULL,
+      createdAt TEXT NOT NULL
     )`
   );
 

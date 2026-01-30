@@ -52,6 +52,19 @@
             </div>
 
             <div class="admin-card">
+                <h3>Giv genstand</h3>
+                <div class="form-group">
+                    <label for="adminItemEmail">E-mail</label>
+                    <input type="email" id="adminItemEmail" placeholder="bruger@email.dk">
+                </div>
+                <div class="form-group">
+                    <label for="adminItemName">Genstand</label>
+                    <input type="text" id="adminItemName" placeholder="Premium badge, VIP skin...">
+                </div>
+                <button type="button" onclick="handleAdminGrantItem()">Giv genstand</button>
+            </div>
+
+            <div class="admin-card">
                 <h3>Brugere</h3>
                 <ul id="adminUsersList" class="admin-users-list"></ul>
             </div>

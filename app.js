@@ -12,6 +12,9 @@ const API_BASE = (() => {
 let guestStats = { xp: 0, level: 1, points: 0 };
 let guestNotifications = [];
 let guestChats = {};
+let accountCheckTimer = null;
+const chatCache = new Map();
+let chatRefreshTimer = null;
 
 function getCurrentPage() {
     return document.body?.dataset?.page || 'home';
@@ -25,6 +28,10 @@ function setHidden(id, hidden) {
     const el = document.getElementById(id);
     if (!el) return;
     el.classList.toggle('hidden', hidden);
+}
+
+function showAccountDeletedNotice() {
+    alert('Din profil er slettet. Du bliver logget ud.');
 }
 
 function setText(id, value) {
@@ -61,6 +68,29 @@ function updateUserUI(user) {
     const headerStats = document.querySelector('.header-stats');
     if (headerStats) {
         headerStats.classList.toggle('hidden', isGuest);
+    }
+}
+
+function startAccountDeletionWatcher(user) {
+    if (!user || user.isGuest || !user.email) return;
+    stopAccountDeletionWatcher();
+    accountCheckTimer = setInterval(async () => {
+        try {
+            await apiRequestWithStatus(`/api/users/${encodeURIComponent(user.email)}`);
+        } catch (err) {
+            if (err.status === 404) {
+                stopAccountDeletionWatcher();
+                showAccountDeletedNotice();
+                handleLogout();
+            }
+        }
+    }, 20000);
+}
+
+function stopAccountDeletionWatcher() {
+    if (accountCheckTimer) {
+        clearInterval(accountCheckTimer);
+        accountCheckTimer = null;
     }
 }
 
@@ -618,11 +648,10 @@ function renderChatMessages(contactId) {
         return;
     }
     let messages = [];
-    if (isGuestUser()) {
+    if (contactId === 'assistant' || isGuestUser()) {
         messages = guestChats[contactId] || [];
     } else {
-        const raw = localStorage.getItem(getChatKey(contactId));
-        messages = raw ? JSON.parse(raw) : [];
+        messages = chatCache.get(contactId) || [];
     }
     messages.forEach(msg => {
         const bubble = document.createElement('div');
@@ -634,17 +663,16 @@ function renderChatMessages(contactId) {
 }
 
 function saveChatMessage(contactId, message) {
-    if (isGuestUser()) {
+    if (contactId === 'assistant' || isGuestUser()) {
         const messages = guestChats[contactId] || [];
         messages.push(message);
         guestChats[contactId] = messages.slice(-100);
         renderChatMessages(contactId);
         return;
     }
-    const raw = localStorage.getItem(getChatKey(contactId));
-    const messages = raw ? JSON.parse(raw) : [];
+    const messages = chatCache.get(contactId) || [];
     messages.push(message);
-    localStorage.setItem(getChatKey(contactId), JSON.stringify(messages.slice(-100)));
+    chatCache.set(contactId, messages.slice(-200));
     renderChatMessages(contactId);
 }
 
@@ -654,7 +682,44 @@ function selectChatContact(contactId) {
     contacts.forEach(el => el.classList.remove('active'));
     const active = document.querySelector(`.chat-contact[data-contact-id="${contactId}"]`);
     if (active) active.classList.add('active');
-    renderChatMessages(contactId);
+    if (contactId && contactId !== 'assistant' && !isGuestUser()) {
+        loadChatThread(contactId);
+    } else {
+        renderChatMessages(contactId);
+    }
+}
+
+function startChatAutoRefresh() {
+    stopChatAutoRefresh();
+    chatRefreshTimer = setInterval(() => {
+        if (!currentChatContact) return;
+        if (currentChatContact === 'assistant') return;
+        if (isGuestUser()) return;
+        loadChatThread(currentChatContact);
+    }, 1000);
+}
+
+function stopChatAutoRefresh() {
+    if (chatRefreshTimer) {
+        clearInterval(chatRefreshTimer);
+        chatRefreshTimer = null;
+    }
+}
+
+async function loadChatThread(contactId) {
+    const current = getCurrentUser();
+    if (!current || !current.email) return;
+    try {
+        const rows = await apiRequest(`/api/chats/${encodeURIComponent(current.email)}?with=${encodeURIComponent(contactId)}`);
+        chatCache.set(contactId, (rows || []).map(row => ({
+            from: row.fromEmail === current.email ? 'me' : 'other',
+            text: row.message,
+            at: Date.parse(row.createdAt) || Date.now()
+        })));
+        renderChatMessages(contactId);
+    } catch (err) {
+        renderChatMessages(contactId);
+    }
 }
 
 async function loadChatContacts() {
@@ -707,6 +772,8 @@ async function loadChatContacts() {
     if (!currentChatContact && contacts.length > 0) {
         selectChatContact(contacts[0].id);
     }
+
+    startChatAutoRefresh();
 }
 
 function getAssistantReply(text) {
@@ -737,6 +804,17 @@ function sendChatMessage() {
         setTimeout(() => {
             saveChatMessage(currentChatContact, { from: 'assistant', text: reply, at: Date.now() });
         }, 600);
+        return;
+    }
+
+    if (!isGuestUser()) {
+        const current = getCurrentUser();
+        if (current?.email) {
+            apiRequest(`/api/chats/${encodeURIComponent(current.email)}`, {
+                method: 'POST',
+                body: JSON.stringify({ to: currentChatContact, message: text })
+            }).then(() => loadChatThread(currentChatContact)).catch(() => null);
+        }
     }
 }
 
@@ -1399,6 +1477,46 @@ async function handleAdminCreateUser() {
     }
 }
 
+async function handleAdminTogglePremium(email, isPremium) {
+    if (!email) return;
+    try {
+        await adminRequest('/api/admin/premium', {
+            method: 'POST',
+            body: JSON.stringify({ email, isPremium })
+        });
+        await loadAdminUsers();
+    } catch (err) {
+        if (err.status === 401) {
+            handleAdminLogout();
+            showAdminError('Admin-login kræves.');
+            return;
+        }
+        showAdminError('Kunne ikke opdatere premium.');
+    }
+}
+
+async function handleAdminGrantItem() {
+    const emailInput = document.getElementById('adminItemEmail');
+    const itemInput = document.getElementById('adminItemName');
+    if (!emailInput || !itemInput) return;
+    const email = emailInput.value.trim();
+    const itemName = itemInput.value.trim();
+    showAdminCreateError('');
+    if (!email || !itemName) {
+        showAdminCreateError('E-mail og genstand er påkrævet.');
+        return;
+    }
+    try {
+        await adminRequest('/api/admin/items', {
+            method: 'POST',
+            body: JSON.stringify({ email, itemName, source: 'admin' })
+        });
+        itemInput.value = '';
+    } catch (err) {
+        showAdminCreateError('Kunne ikke give genstand.');
+    }
+}
+
 async function handleAdminDeleteUser(email) {
     if (!email) return;
     const ok = confirm(`Slet brugeren ${email}?`);
@@ -1437,6 +1555,7 @@ async function loadAdminUsers() {
                 <strong>${user.name || 'Ukendt'}</strong>
                 <span>${user.email || ''}</span>
                 <span>Oprettet: ${formatAdminDate(user.createdAt)}</span>
+                <span>${user.isPremium ? 'Premium: Ja' : 'Premium: Nej'}</span>
             `;
 
             const actions = document.createElement('div');
@@ -1448,6 +1567,13 @@ async function loadAdminUsers() {
             deleteBtn.textContent = 'Slet';
             deleteBtn.addEventListener('click', () => handleAdminDeleteUser(user.email));
 
+            const premiumBtn = document.createElement('button');
+            premiumBtn.type = 'button';
+            premiumBtn.className = 'admin-premium-btn';
+            premiumBtn.textContent = user.isPremium ? 'Fjern premium' : 'Giv premium';
+            premiumBtn.addEventListener('click', () => handleAdminTogglePremium(user.email, !user.isPremium));
+
+            actions.appendChild(premiumBtn);
             actions.appendChild(deleteBtn);
             li.appendChild(info);
             li.appendChild(actions);
@@ -1474,6 +1600,7 @@ function initAdminPage() {
 
 function closeChatPage() {
     navigateTo('/');
+    stopChatAutoRefresh();
 }
 
 function getCurrentUser() {
@@ -2639,6 +2766,7 @@ async function showDashboard(name, email, isGuest) {
     await refreshStoredEvents();
     await loadEvents();
     await updateUserLocation();
+    startAccountDeletionWatcher({ name, email, isGuest });
 }
 
 function handleProfile() {
@@ -2654,6 +2782,8 @@ function handleLogout() {
     guestStats = { xp: 0, level: 1, points: 0 };
     guestNotifications = [];
     guestChats = {};
+    stopAccountDeletionWatcher();
+    stopChatAutoRefresh();
 
     if (getCurrentPage() !== 'home') {
         navigateTo('/');
@@ -2708,6 +2838,7 @@ async function applyUserToPage(user) {
     updateStatsUI();
     renderNotifications();
     await refreshStoredEvents();
+    startAccountDeletionWatcher(user);
 
     const page = getCurrentPage();
     if (page === 'friends' && user.isGuest) {
