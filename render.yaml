@@ -5,6 +5,12 @@ services:
     plan: free
     buildCommand: npm install
     startCommand: npm start
+    disk:
+      name: event-storage-data
+      mountPath: /var/data
+      sizeGB: 1
     envVars:
       - key: CORS_ORIGIN
         value: https://hookedirl.com,https://www.hookedirl.com,https://leventeirikikss.github.io
+      - key: DB_FILE
+        value: /var/data/app.db
