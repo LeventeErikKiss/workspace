@@ -876,6 +876,29 @@ h3 {
     gap: 12px;
 }
 
+.avaturn-subtitle {
+    color: #555;
+    font-size: 14px;
+    margin-bottom: 12px;
+}
+
+.avaturn-sdk-container {
+    width: 100%;
+    height: 70vh;
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    border-radius: 12px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.avaturn-preview-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 8px;
+    display: none;
+}
+
 .avatar-canvas-clickable {
     position: relative;
     width: 100%;

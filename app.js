@@ -840,6 +840,7 @@ let currentAvatarState = {
     shoesColor: '#000000',
     expression: 'happy'
 };
+let avaturnAvatarData = null;
 
 function resizeAvatarCanvas() {
     const canvas = document.getElementById('avatarCanvas');
@@ -1272,14 +1273,49 @@ async function saveAvatarAppearance() {
     }
 }
 
+async function saveAvaturnAvatar(data) {
+    const user = getCurrentUser();
+    if (!user) return;
+    const payload = { provider: 'avaturn', export: data };
+    avaturnAvatarData = payload;
+    if (user.isGuest) {
+        localStorage.setItem('guestAvaturnAvatar', JSON.stringify(payload));
+        renderAvatarPreview();
+        alert('✅ Avaturn avatar gemt lokalt for gæst.');
+        return;
+    }
+
+    await apiRequest(`/api/avatar/${encodeURIComponent(user.email)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ data: payload })
+    });
+    renderAvatarPreview();
+    alert('✅ Avaturn avatar gemt!');
+}
+
 async function loadAvatarAppearance() {
     const currentUser = sessionStorage.getItem('currentUser');
     if (currentUser) {
         const user = JSON.parse(currentUser);
-        if (user.isGuest) return;
+        avaturnAvatarData = null;
+        if (user.isGuest) {
+            const avatarRaw = localStorage.getItem('guestAvaturnAvatar');
+            if (avatarRaw) {
+                try {
+                    avaturnAvatarData = JSON.parse(avatarRaw);
+                } catch (err) {
+                    // ignore parse issues
+                }
+            }
+            return;
+        }
         try {
             const response = await apiRequest(`/api/avatar/${encodeURIComponent(user.email)}`);
             if (response?.data) {
+                if (response.data.provider === 'avaturn') {
+                    avaturnAvatarData = response.data;
+                    return;
+                }
                 currentAvatarState = response.data;
 
                 // Restore form values
@@ -1304,6 +1340,64 @@ async function loadAvatarAppearance() {
         } catch (err) {
             // ignore missing avatar
         }
+    }
+}
+
+function getAvaturnPreviewUrl(data) {
+    if (!data) return null;
+    const exportData = data.export || data;
+    return (
+        exportData?.avatar?.image?.url ||
+        exportData?.avatar?.imageUrl ||
+        exportData?.avatarImageUrl ||
+        exportData?.preview?.url ||
+        exportData?.previewUrl ||
+        exportData?.thumbnailUrl ||
+        exportData?.avatar?.thumbnail?.url ||
+        exportData?.avatar?.thumbnailUrl ||
+        null
+    );
+}
+
+function renderAvatarPreview() {
+    const previewCanvas = document.getElementById('avatarCanvasPreview');
+    const container = document.querySelector('.avatar-canvas-clickable');
+    if (!container) return;
+
+    let img = document.getElementById('avaturnPreviewImage');
+    if (!img) {
+        img = document.createElement('img');
+        img.id = 'avaturnPreviewImage';
+        img.className = 'avaturn-preview-image';
+        container.appendChild(img);
+    }
+
+    const previewUrl = getAvaturnPreviewUrl(avaturnAvatarData);
+    if (previewUrl) {
+        img.src = previewUrl;
+        img.style.display = 'block';
+        if (previewCanvas) previewCanvas.style.display = 'none';
+        return;
+    }
+
+    img.style.display = 'none';
+    if (previewCanvas) previewCanvas.style.display = 'block';
+}
+
+async function initAvaturn() {
+    const container = document.getElementById('avaturn-sdk-container');
+    if (!container) return;
+    try {
+        const sdkModule = await import('https://cdn.jsdelivr.net/npm/@avaturn/sdk/dist/index.js');
+        const { AvaturnSDK } = sdkModule;
+        const sdk = new AvaturnSDK();
+        const url = 'https://hookedirl.avaturn.dev';
+        await sdk.init(container, { url });
+        sdk.on('export', async (data) => {
+            await saveAvaturnAvatar(data);
+        });
+    } catch (err) {
+        container.innerHTML = '<p>Kunne ikke indlæse Avaturn. Prøv igen senere.</p>';
     }
 }
 
@@ -2756,9 +2850,12 @@ async function showDashboard(name, email, isGuest) {
     // Update avatar with user initials
     // Load saved appearance and init preview
     await loadAvatarAppearance();
-    setTimeout(() => {
-        initAvatarPreview();
-    }, 100);
+    renderAvatarPreview();
+    if (!avaturnAvatarData) {
+        setTimeout(() => {
+            initAvatarPreview();
+        }, 100);
+    }
 
     updateStatsUI();
     renderNotifications();
@@ -2849,9 +2946,7 @@ async function applyUserToPage(user) {
 
     if (page === 'profile') {
         await loadAvatarAppearance();
-        setTimeout(() => {
-            initAvatarScene();
-        }, 100);
+        await initAvaturn();
         return;
     }
 
