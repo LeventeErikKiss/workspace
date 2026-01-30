@@ -152,7 +152,7 @@ app.post('/api/admin/users', requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'name and email required' });
     }
 
-    const existing = await get('SELECT email FROM users WHERE email = ?', [email]);
+    const existing = await get('SELECT email FROM users WHERE LOWER(email) = LOWER(?)', [email]);
     if (existing) return res.status(409).json({ error: 'email exists' });
 
     const hashed = password ? await bcrypt.hash(password, 10) : null;
@@ -195,7 +195,7 @@ app.post('/api/users/register', async (req, res) => {
       return res.status(400).json({ error: 'name, email, password required' });
     }
 
-    const existing = await get('SELECT email FROM users WHERE email = ?', [email]);
+    const existing = await get('SELECT email FROM users WHERE LOWER(email) = LOWER(?)', [email]);
     if (existing) return res.status(409).json({ error: 'email exists' });
 
     const hashed = await bcrypt.hash(password, 10);

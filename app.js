@@ -114,6 +114,34 @@ async function apiRequest(path, options = {}) {
     return response.json();
 }
 
+async function apiRequestWithStatus(path, options = {}) {
+    const response = await fetch(`${API_BASE}${path}`, {
+        headers: {
+            'Content-Type': 'application/json',
+            ...(options.headers || {})
+        },
+        ...options
+    });
+
+    let payload = null;
+    if (response.status !== 204) {
+        try {
+            payload = await response.json();
+        } catch (err) {
+            payload = null;
+        }
+    }
+
+    if (!response.ok) {
+        const error = new Error('API request failed');
+        error.status = response.status;
+        error.payload = payload;
+        throw error;
+    }
+
+    return payload;
+}
+
 function getAdminAuth() {
     const raw = sessionStorage.getItem('adminAuth');
     if (!raw) return null;
@@ -137,7 +165,7 @@ async function adminRequest(path, options = {}) {
     if (!auth) {
         throw new Error('admin auth missing');
     }
-    return apiRequest(path, {
+    return apiRequestWithStatus(path, {
         ...options,
         headers: {
             ...(options.headers || {}),
@@ -1358,7 +1386,16 @@ async function handleAdminCreateUser() {
         passwordInput.value = '';
         await loadAdminUsers();
     } catch (err) {
-        showAdminCreateError('Kunne ikke oprette bruger. Tjek om e-mail allerede findes.');
+        if (err.status === 401) {
+            handleAdminLogout();
+            showAdminCreateError('Admin-login kræves.');
+            return;
+        }
+        if (err.status === 409) {
+            showAdminCreateError('E-mail findes allerede.');
+            return;
+        }
+        showAdminCreateError('Kunne ikke oprette bruger.');
     }
 }
 
@@ -1417,6 +1454,10 @@ async function loadAdminUsers() {
             list.appendChild(li);
         });
     } catch (err) {
+        if (err.status === 401) {
+            handleAdminLogout();
+            showAdminError('Admin-login kræves.');
+        }
         const li = document.createElement('li');
         li.textContent = 'Kunne ikke hente brugere.';
         list.appendChild(li);
@@ -1442,13 +1483,17 @@ function getCurrentUser() {
 }
 
 async function getAllUserProfiles() {
-    const users = await apiRequest('/api/users');
-    const seen = new Set();
-    return (users || []).filter(u => {
-        if (!u.email || seen.has(u.email)) return false;
-        seen.add(u.email);
-        return true;
-    });
+    try {
+        const users = await apiRequest('/api/users');
+        const seen = new Set();
+        return (users || []).filter(u => {
+            if (!u.email || seen.has(u.email)) return false;
+            seen.add(u.email);
+            return true;
+        });
+    } catch (err) {
+        return [];
+    }
 }
 
 async function getFriends(email) {

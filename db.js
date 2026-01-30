@@ -7,10 +7,23 @@ let pool = null;
 
 if (usePostgres) {
   const { Pool } = require('pg');
-  const disableSsl = String(process.env.PGSSL || '').toLowerCase() === 'false';
+  const pgsslRaw = String(process.env.PGSSL || '').toLowerCase();
+  const forceSsl = pgsslRaw === 'true';
+  const disableSsl = pgsslRaw === 'false';
+  let sslFromUrl = true;
+  try {
+    const parsed = new URL(process.env.DATABASE_URL);
+    const sslMode = parsed.searchParams.get('sslmode');
+    if (sslMode && sslMode.toLowerCase() === 'disable') {
+      sslFromUrl = false;
+    }
+  } catch (err) {
+    sslFromUrl = true;
+  }
+  const useSsl = disableSsl ? false : (forceSsl ? true : sslFromUrl);
   pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: disableSsl ? false : { rejectUnauthorized: false }
+    ssl: useSsl ? { rejectUnauthorized: false } : false
   });
 } else {
   const sqlite3 = require('sqlite3').verbose();
