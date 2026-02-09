@@ -953,7 +953,7 @@ h3 {
 }
 
 .dashboard-avaturn {
-    height: 420px;
+    height: 520px;
 }
 
 .avaturn-sdk-container button {
@@ -973,10 +973,10 @@ h3 {
 }
 
 .avaturn-sdk-container iframe {
-    transform: scale(0.92);
-    transform-origin: top left;
-    width: 108.7%;
-    height: 108.7%;
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
 }
 
 .avaturn-preview-image {
