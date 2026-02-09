@@ -3288,9 +3288,7 @@ async function applyUserToPage(user) {
     }
 
     if (page === 'profile') {
-        await loadAvatarAppearance();
-        renderHeaderAvatar();
-        await initAvaturn();
+        navigateTo('/');
         return;
     }
 
