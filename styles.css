@@ -452,9 +452,10 @@ h3 {
 
 .map-float {
     position: fixed;
-    bottom: 28px;
-    right: 28px;
-    left: auto;
+    bottom: 120px;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
     width: 150px;
     height: 150px;
     z-index: 300;
@@ -838,20 +839,22 @@ h3 {
     padding: 0 20px;
 }
 
+
 .dashboard-card {
     width: 100%;
     max-width: 420px;
-    background: rgba(255, 255, 255, 0.9);
+    background: linear-gradient(180deg, rgba(233, 75, 40, 0.9) 0%, rgba(43, 196, 169, 0.9) 100%);
     border-radius: 12px;
     padding: 18px 20px;
     box-shadow: var(--shadow-soft);
-    border: var(--border-soft);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #fff;
 }
 
 .dashboard-card h3 {
     margin: 0 0 12px 0;
     font-size: 16px;
-    color: #333;
+    color: #fff;
 }
 
 .popular-items-list {
@@ -860,7 +863,7 @@ h3 {
     margin: 0;
     display: grid;
     gap: 8px;
-    color: #333;
+    color: #fff;
     font-size: 13px;
 }
 
@@ -868,7 +871,7 @@ h3 {
     display: flex;
     align-items: center;
     gap: 8px;
-    background: rgba(233, 75, 40, 0.08);
+    background: rgba(255, 255, 255, 0.2);
     border-radius: 10px;
     padding: 8px 10px;
 }
@@ -880,7 +883,7 @@ h3 {
     width: 22px;
     height: 22px;
     border-radius: 50%;
-    background: rgba(233, 75, 40, 0.2);
+    background: rgba(255, 255, 255, 0.35);
     font-weight: 700;
     font-size: 12px;
 }
@@ -888,7 +891,7 @@ h3 {
 .popular-count {
     margin-left: auto;
     font-weight: 700;
-    color: #E94B28;
+    color: #fff;
 }
 
 .profile-section {
