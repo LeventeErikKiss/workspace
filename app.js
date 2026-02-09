@@ -174,6 +174,27 @@ async function apiRequestWithStatus(path, options = {}) {
     return payload;
 }
 
+async function apiRequestWithCredentials(path, options = {}) {
+    const response = await fetch(`${API_BASE}${path}`, {
+        headers: {
+            'Content-Type': 'application/json',
+            ...(options.headers || {})
+        },
+        credentials: 'include',
+        ...options
+    });
+
+    if (!response.ok) {
+        throw new Error('API request failed');
+    }
+
+    if (response.status === 204) {
+        return null;
+    }
+
+    return response.json();
+}
+
 function getAdminAuth() {
     const raw = sessionStorage.getItem('adminAuth');
     if (!raw) return null;
@@ -1299,7 +1320,7 @@ async function saveAvaturnAvatar(data) {
         return;
     }
 
-    await apiRequest(`/api/avatar/${encodeURIComponent(user.email)}`, {
+    await apiRequestWithCredentials(`/api/avatar/${encodeURIComponent(user.email)}`, {
         method: 'PUT',
         body: JSON.stringify({ data: payload })
     });
@@ -1325,7 +1346,7 @@ async function loadAvatarAppearance() {
             return;
         }
         try {
-            const response = await apiRequest(`/api/avatar/${encodeURIComponent(user.email)}`);
+            const response = await apiRequestWithCredentials(`/api/avatar/${encodeURIComponent(user.email)}`);
             if (response?.data) {
                 if (response.data.provider === 'avaturn') {
                     avaturnAvatarData = response.data;
@@ -1409,7 +1430,7 @@ async function loadUserAvatarPreview(email, el, fallbackText) {
     }
 
     try {
-        const response = await apiRequest(`/api/avatar/${encodeURIComponent(email)}`);
+        const response = await apiRequestWithCredentials(`/api/avatar/${encodeURIComponent(email)}`);
         const url = response?.data?.provider === 'avaturn'
             ? getAvaturnPreviewUrl(response.data)
             : null;
