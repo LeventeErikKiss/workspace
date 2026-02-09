@@ -1320,6 +1320,7 @@ async function saveAvaturnAvatar(data) {
         return;
     }
 
+    localStorage.setItem(`userAvaturnAvatar:${user.email}`, JSON.stringify(payload));
     await apiRequestWithCredentials(`/api/avatar/${encodeURIComponent(user.email)}`, {
         method: 'PUT',
         body: JSON.stringify({ data: payload })
@@ -1376,6 +1377,17 @@ async function loadAvatarAppearance() {
         } catch (err) {
             // ignore missing avatar
         }
+
+        if (!avaturnAvatarData) {
+            const stored = localStorage.getItem(`userAvaturnAvatar:${user.email}`);
+            if (stored) {
+                try {
+                    avaturnAvatarData = JSON.parse(stored);
+                } catch (err) {
+                    // ignore parse issues
+                }
+            }
+        }
     }
 }
 
@@ -1427,6 +1439,22 @@ async function loadUserAvatarPreview(email, el, fallbackText) {
         const cachedUrl = userAvatarPreviewCache.get(email);
         if (cachedUrl) applyAvatarImage(el, cachedUrl);
         return;
+    }
+
+    const current = getCurrentUser();
+    if (current?.email && current.email === email) {
+        const stored = localStorage.getItem(`userAvaturnAvatar:${email}`);
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored);
+                const localUrl = getAvaturnPreviewUrl(parsed);
+                userAvatarPreviewCache.set(email, localUrl || null);
+                if (localUrl) applyAvatarImage(el, localUrl);
+                return;
+            } catch (err) {
+                userAvatarPreviewCache.set(email, null);
+            }
+        }
     }
 
     try {

@@ -28,36 +28,6 @@
 
             <button class="admin-button" type="button" onclick="openAdminPage()">🔒 Admin login</button>
 
-            <div class="toggle-form">
-                Har du ikke en bruger? <a onclick="toggleForm()">Opret profil</a>
-            </div>
-        </div>
-
-        <!-- Register Form -->
-        <div id="registerForm" class="hidden">
-            <h3>Opret profil</h3>
-            <div class="form-group">
-                <label for="regName">Navn:</label>
-                <input type="text" id="regName" placeholder="Dit fulde navn">
-            </div>
-            <div class="form-group">
-                <label for="regEmail">E-mail:</label>
-                <input type="email" id="regEmail" placeholder="din@email.dk">
-            </div>
-            <div class="form-group">
-                <label for="regPassword">Adgangskode:</label>
-                <input type="password" id="regPassword" placeholder="Vælg en adgangskode">
-            </div>
-            <div class="form-group">
-                <label for="regConfirmPassword">Bekræft adgangskode:</label>
-                <input type="password" id="regConfirmPassword" placeholder="Bekræft adgangskoden">
-            </div>
-            <div id="registerError"></div>
-            <button onclick="handleRegister()">Opret profil</button>
-
-            <div class="toggle-form">
-                Har du allerede en bruger? <a onclick="toggleForm()">Log ind her</a>
-            </div>
         </div>
 
     </div>
