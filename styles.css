@@ -900,7 +900,7 @@ h3 {
     background: linear-gradient(180deg, rgba(233, 75, 40, 0.9) 0%, rgba(43, 196, 169, 0.9) 100%);
     border-radius: 8px;
     padding: 25px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+    box-shadow: none;
     text-align: center;
     flex-shrink: 0;
     display: flex;
@@ -908,11 +908,12 @@ h3 {
     gap: 15px;
     height: auto;
     color: white;
+    overflow: hidden;
 }
 
 .dashboard-avatar-section {
-    min-width: 294px;
-    width: 294px;
+    min-width: 420px;
+    width: 420px;
 }
 
 .profile-section h3 {
@@ -955,13 +956,13 @@ h3 {
     width: 100%;
     height: 70vh;
     border: none;
-    border-radius: 12px;
+    border-radius: 10px;
     overflow: hidden;
-    background: #fff;
+    background: transparent;
 }
 
 .dashboard-avaturn {
-    height: 520px;
+    height: 560px;
 }
 
 .avaturn-sdk-container button {
