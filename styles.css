@@ -892,8 +892,8 @@ h3 {
 }
 
 .profile-section {
-    min-width: 360px;
-    width: 360px;
+    min-width: 504px;
+    width: 504px;
     background: linear-gradient(180deg, rgba(233, 75, 40, 0.9) 0%, rgba(43, 196, 169, 0.9) 100%);
     border-radius: 8px;
     padding: 25px;
