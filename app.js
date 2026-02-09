@@ -869,6 +869,13 @@ let avaturnAvatarData = null;
 let avaturnSdkLoaded = false;
 let avaturnInitInProgress = false;
 const userAvatarPreviewCache = new Map();
+let avaturnPreviewRenderer = null;
+let avaturnPreviewScene = null;
+let avaturnPreviewCamera = null;
+let avaturnPreviewModel = null;
+let avaturnPreviewModelUrl = null;
+let avaturnPreviewAnimating = false;
+let gltfLoaderPromise = null;
 const AVATURN_SDK_SOURCES = [
     { type: 'module', url: 'https://cdn.jsdelivr.net/npm/@avaturn/sdk/dist/index.js' },
     { type: 'module', url: 'https://unpkg.com/@avaturn/sdk/dist/index.js' },
@@ -1419,6 +1426,123 @@ function getAvaturnPreviewUrl(data) {
     );
 }
 
+function getAvaturnModelUrl(data) {
+    if (!data) return null;
+    const exportData = data.export || data;
+    return (
+        exportData?.avatar?.model?.url ||
+        exportData?.avatar?.modelUrl ||
+        exportData?.model?.url ||
+        exportData?.modelUrl ||
+        exportData?.avatarModelUrl ||
+        exportData?.glbUrl ||
+        exportData?.avatar?.glbUrl ||
+        exportData?.data?.avatar?.model?.url ||
+        exportData?.data?.avatar?.modelUrl ||
+        exportData?.data?.model?.url ||
+        exportData?.data?.modelUrl ||
+        data?.data?.avatar?.model?.url ||
+        data?.data?.avatar?.modelUrl ||
+        data?.data?.model?.url ||
+        data?.data?.modelUrl ||
+        null
+    );
+}
+
+async function loadGltfLoader() {
+    if (gltfLoaderPromise) return gltfLoaderPromise;
+    gltfLoaderPromise = import('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/jsm/loaders/GLTFLoader.js')
+        .then(module => module.GLTFLoader)
+        .catch(() => import('https://unpkg.com/three@0.128.0/examples/jsm/loaders/GLTFLoader.js').then(module => module.GLTFLoader));
+    return gltfLoaderPromise;
+}
+
+function fitCameraToObject(camera, object, offset = 1.6) {
+    const box = new THREE.Box3().setFromObject(object);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const fov = camera.fov * (Math.PI / 180);
+    const cameraZ = Math.abs(maxDim / (2 * Math.tan(fov / 2))) * offset;
+
+    camera.position.set(center.x, center.y + size.y * 0.1, cameraZ);
+    camera.lookAt(center);
+    camera.updateProjectionMatrix();
+}
+
+async function renderAvaturnModelPreview(data) {
+    const canvas = document.getElementById('avatarCanvasPreview');
+    if (!canvas) return false;
+
+    const modelUrl = getAvaturnModelUrl(data);
+    if (!modelUrl) return false;
+
+    const rect = canvas.getBoundingClientRect();
+    const width = Math.max(1, Math.round(rect.width));
+    const height = Math.max(1, Math.round(rect.height));
+
+    if (!avaturnPreviewRenderer) {
+        avaturnPreviewRenderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+        avaturnPreviewRenderer.setPixelRatio(window.devicePixelRatio);
+        avaturnPreviewScene = new THREE.Scene();
+        avaturnPreviewCamera = new THREE.PerspectiveCamera(40, width / height, 0.1, 1000);
+
+        const light1 = new THREE.DirectionalLight(0xffffff, 1);
+        light1.position.set(5, 5, 5);
+        avaturnPreviewScene.add(light1);
+
+        const light2 = new THREE.DirectionalLight(0xffffff, 0.6);
+        light2.position.set(-5, 5, 5);
+        avaturnPreviewScene.add(light2);
+
+        const ambient = new THREE.AmbientLight(0xffffff, 0.7);
+        avaturnPreviewScene.add(ambient);
+    }
+
+    avaturnPreviewRenderer.setSize(width, height, false);
+    avaturnPreviewCamera.aspect = width / height;
+    avaturnPreviewCamera.updateProjectionMatrix();
+
+    if (avaturnPreviewModelUrl !== modelUrl) {
+        const GLTFLoader = await loadGltfLoader();
+        const loader = new GLTFLoader();
+        loader.setCrossOrigin('anonymous');
+
+        const gltf = await new Promise((resolve, reject) => {
+            loader.load(modelUrl, resolve, undefined, reject);
+        });
+
+        if (avaturnPreviewModel) {
+            avaturnPreviewScene.remove(avaturnPreviewModel);
+        }
+
+        avaturnPreviewModel = gltf.scene;
+        avaturnPreviewScene.add(avaturnPreviewModel);
+        fitCameraToObject(avaturnPreviewCamera, avaturnPreviewModel);
+        avaturnPreviewModelUrl = modelUrl;
+    }
+
+    if (!avaturnPreviewAnimating) {
+        avaturnPreviewAnimating = true;
+        const animate = () => {
+            if (!avaturnPreviewRenderer || !avaturnPreviewScene || !avaturnPreviewCamera) {
+                avaturnPreviewAnimating = false;
+                return;
+            }
+            if (avaturnPreviewModel) {
+                avaturnPreviewModel.rotation.y += 0.005;
+            }
+            avaturnPreviewRenderer.render(avaturnPreviewScene, avaturnPreviewCamera);
+            requestAnimationFrame(animate);
+        };
+        animate();
+    } else {
+        avaturnPreviewRenderer.render(avaturnPreviewScene, avaturnPreviewCamera);
+    }
+
+    return true;
+}
+
 function applyAvatarImage(el, url) {
     if (!el || !url) return;
     el.textContent = '';
@@ -1500,6 +1624,13 @@ function renderAvatarPreview() {
         img.src = previewUrl;
         img.style.display = 'block';
         if (previewCanvas) previewCanvas.style.display = 'none';
+        return;
+    }
+
+    if (avaturnAvatarData) {
+        img.style.display = 'none';
+        if (previewCanvas) previewCanvas.style.display = 'block';
+        renderAvaturnModelPreview(avaturnAvatarData).catch(() => null);
         return;
     }
 
