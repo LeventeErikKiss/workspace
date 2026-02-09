@@ -599,6 +599,7 @@ function handleShopPurchase(item, mode) {
         addNotification('Gæsteprofil kan ikke gemme køb eller point.');
         return;
     }
+    const current = getCurrentUser();
     const stats = getUserStats();
     if (mode === 'points') {
         if (stats.points < item.price) {
@@ -606,8 +607,20 @@ function handleShopPurchase(item, mode) {
             return;
         }
         saveUserStats({ ...stats, points: stats.points - item.price });
+        if (current?.email) {
+            apiRequest(`/api/items/${encodeURIComponent(current.email)}`, {
+                method: 'POST',
+                body: JSON.stringify({ itemName: item.name, source: 'shop-points' })
+            }).catch(() => null);
+        }
         addNotification(`Købte ${item.name} for ${item.price} point.`);
         return;
+    }
+    if (current?.email) {
+        apiRequest(`/api/items/${encodeURIComponent(current.email)}`, {
+            method: 'POST',
+            body: JSON.stringify({ itemName: item.name, source: 'shop-dkk' })
+        }).catch(() => null);
     }
     addNotification('DKK-køb afventer betaling. Point gives først når transaktionen er gennemført.');
 }
@@ -1726,12 +1739,7 @@ function loadScript(url) {
 }
 
 function openProfilePage() {
-    const section = document.getElementById('dashboardAvatarSection');
-    if (section) {
-        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        return;
-    }
-    navigateTo('/');
+    navigateTo('/profile/');
 }
 
 function backToDashboard() {
@@ -3160,7 +3168,9 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 async function loginUser(name, email, isGuest, options = {}) {
-    sessionStorage.setItem('currentUser', JSON.stringify({ name, email, isGuest }));
+    const payload = JSON.stringify({ name, email, isGuest });
+    sessionStorage.setItem('currentUser', payload);
+    localStorage.setItem('currentUser', payload);
     if (!isGuest && !options.skipServerLogin) {
         await apiRequest('/api/users/login', {
             method: 'POST',
@@ -3199,6 +3209,7 @@ async function showDashboard(name, email, isGuest) {
     renderAvatarPreview();
     renderHeaderAvatar();
     await initAvaturn();
+    await loadPopularItems();
 
     updateStatsUI();
     renderNotifications();
@@ -3219,6 +3230,7 @@ function handleSettings() {
 
 function handleLogout() {
     sessionStorage.removeItem('currentUser');
+    localStorage.removeItem('currentUser');
     guestStats = { xp: 0, level: 1, points: 0 };
     guestNotifications = [];
     guestChats = {};
@@ -3251,7 +3263,14 @@ function handleLogout() {
 }
 
 async function checkLogin() {
-    const currentUser = sessionStorage.getItem('currentUser');
+    let currentUser = sessionStorage.getItem('currentUser');
+    if (!currentUser) {
+        const storedUser = localStorage.getItem('currentUser');
+        if (storedUser) {
+            sessionStorage.setItem('currentUser', storedUser);
+            currentUser = storedUser;
+        }
+    }
     const currentPage = getCurrentPage();
     if (currentPage === 'admin') {
         initAdminPage();
@@ -3265,12 +3284,27 @@ async function checkLogin() {
     }
 
     const user = JSON.parse(currentUser);
+    await ensureUserExists(user);
     if (getCurrentPage() === 'home') {
         await showDashboard(user.name, user.email, user.isGuest);
         return;
     }
 
     await applyUserToPage(user);
+}
+
+async function ensureUserExists(user) {
+    if (!user || user.isGuest || !user.email) return;
+    try {
+        await apiRequestWithStatus(`/api/users/${encodeURIComponent(user.email)}`);
+    } catch (err) {
+        if (err.status === 404) {
+            await apiRequest('/api/users/login', {
+                method: 'POST',
+                body: JSON.stringify({ name: user.name, email: user.email })
+            });
+        }
+    }
 }
 
 async function applyUserToPage(user) {
@@ -3288,7 +3322,9 @@ async function applyUserToPage(user) {
     }
 
     if (page === 'profile') {
-        navigateTo('/');
+        await loadAvatarAppearance();
+        renderHeaderAvatar();
+        await initAvaturn();
         return;
     }
 
@@ -3326,6 +3362,31 @@ async function applyUserToPage(user) {
 
     if (page === 'chat') {
         await loadChatContacts();
+    }
+}
+
+async function loadPopularItems() {
+    const list = document.getElementById('popularItemsList');
+    if (!list) return;
+    list.innerHTML = '';
+    try {
+        const rows = await apiRequest('/api/items/popular');
+        if (!Array.isArray(rows) || rows.length === 0) {
+            const li = document.createElement('li');
+            li.textContent = 'Ingen data endnu.';
+            list.appendChild(li);
+            return;
+        }
+
+        rows.slice(0, 5).forEach((row, index) => {
+            const li = document.createElement('li');
+            li.innerHTML = `<span class="popular-rank">${index + 1}</span> ${row.itemName} <span class="popular-count">${row.count}x</span>`;
+            list.appendChild(li);
+        });
+    } catch (err) {
+        const li = document.createElement('li');
+        li.textContent = 'Kunne ikke hente data.';
+        list.appendChild(li);
     }
 }
 

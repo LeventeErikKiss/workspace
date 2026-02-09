@@ -453,6 +453,38 @@ app.get('/api/items/:email', async (req, res) => {
   }
 });
 
+app.post('/api/items/:email', async (req, res) => {
+  try {
+    const email = normalizeEmail(req.params.email);
+    const itemName = String(req.body?.itemName || '').trim();
+    const source = String(req.body?.source || 'shop');
+    if (!email || !itemName) return res.status(400).json({ error: 'email and itemName required' });
+    await run('INSERT INTO items (email, itemName, source, createdAt) VALUES (?, ?, ?, ?)', [
+      email,
+      itemName,
+      source,
+      nowIso()
+    ]);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: 'items create failed' });
+  }
+});
+
+app.get('/api/items/popular', async (req, res) => {
+  try {
+    const rows = await all(
+      'SELECT itemName, COUNT(*) as count FROM items GROUP BY itemName ORDER BY count DESC LIMIT 5'
+    );
+    res.json(rows.map(row => ({
+      itemName: row.itemName,
+      count: Number(row.count || 0)
+    })));
+  } catch (err) {
+    res.status(500).json({ error: 'popular items read failed' });
+  }
+});
+
 app.get('/api/chats/:email', async (req, res) => {
   try {
     const email = normalizeEmail(req.params.email);
