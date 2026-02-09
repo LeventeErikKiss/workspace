@@ -841,6 +841,14 @@ let currentAvatarState = {
     expression: 'happy'
 };
 let avaturnAvatarData = null;
+let avaturnSdkLoaded = false;
+let avaturnInitInProgress = false;
+const AVATURN_SDK_SOURCES = [
+    { type: 'module', url: 'https://cdn.jsdelivr.net/npm/@avaturn/sdk/dist/index.js' },
+    { type: 'module', url: 'https://unpkg.com/@avaturn/sdk/dist/index.js' },
+    { type: 'script', url: 'https://cdn.jsdelivr.net/npm/@avaturn/sdk/dist/avaturn-sdk.umd.js' },
+    { type: 'script', url: 'https://unpkg.com/@avaturn/sdk/dist/avaturn-sdk.umd.js' }
+];
 
 function resizeAvatarCanvas() {
     const canvas = document.getElementById('avatarCanvas');
@@ -1387,9 +1395,17 @@ function renderAvatarPreview() {
 async function initAvaturn() {
     const container = document.getElementById('avaturn-sdk-container');
     if (!container) return;
+    if (avaturnInitInProgress) return;
+    avaturnInitInProgress = true;
+    container.innerHTML = '<p>Indlaeser Avaturn editor...</p>';
+
     try {
-        const sdkModule = await import('https://cdn.jsdelivr.net/npm/@avaturn/sdk/dist/index.js');
-        const { AvaturnSDK } = sdkModule;
+        const AvaturnSDK = await loadAvaturnSdk();
+        if (!AvaturnSDK) {
+            throw new Error('Avaturn SDK ikke tilgaengelig');
+        }
+
+        container.innerHTML = '';
         const sdk = new AvaturnSDK();
         const url = 'https://hookedirl.avaturn.dev';
         await sdk.init(container, { url });
@@ -1397,8 +1413,47 @@ async function initAvaturn() {
             await saveAvaturnAvatar(data);
         });
     } catch (err) {
-        container.innerHTML = '<p>Kunne ikke indlæse Avaturn. Prøv igen senere.</p>';
+        console.error('Avaturn init fejl', err);
+        container.innerHTML = '<p>Kunne ikke indlaese Avaturn. Proev igen senere.</p>';
+    } finally {
+        avaturnInitInProgress = false;
     }
+}
+
+async function loadAvaturnSdk() {
+    if (avaturnSdkLoaded && window.AvaturnSDK) return window.AvaturnSDK;
+    for (const source of AVATURN_SDK_SOURCES) {
+        try {
+            if (source.type === 'module') {
+                const sdkModule = await import(source.url);
+                const AvaturnSDK = sdkModule?.AvaturnSDK || sdkModule?.default || sdkModule;
+                if (AvaturnSDK) {
+                    avaturnSdkLoaded = true;
+                    return AvaturnSDK;
+                }
+            } else {
+                await loadScript(source.url);
+                if (window.AvaturnSDK) {
+                    avaturnSdkLoaded = true;
+                    return window.AvaturnSDK;
+                }
+            }
+        } catch (err) {
+            // Try next source.
+        }
+    }
+    return null;
+}
+
+function loadScript(url) {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = url;
+        script.async = true;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error(`Kunne ikke indlaese ${url}`));
+        document.head.appendChild(script);
+    });
 }
 
 function openProfilePage() {
