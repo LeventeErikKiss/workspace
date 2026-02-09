@@ -907,6 +907,11 @@ h3 {
     color: white;
 }
 
+.dashboard-avatar-section {
+    min-width: 420px;
+    width: 420px;
+}
+
 .profile-section h3 {
     margin: 0 0 15px 0;
     color: white;
