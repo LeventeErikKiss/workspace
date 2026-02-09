@@ -1129,7 +1129,7 @@ h3 {
 .friend-item {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     gap: 12px;
     padding: 12px;
     border-radius: 8px;
@@ -1142,6 +1142,20 @@ h3 {
     background-color: #efefef;
     transform: translateY(-2px);
     box-shadow: 0 8px 16px rgba(15, 23, 42, 0.08);
+}
+
+.friend-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 13px;
+    flex-shrink: 0;
 }
 
 .friend-meta {
@@ -1164,6 +1178,7 @@ h3 {
 .friend-actions {
     display: flex;
     gap: 8px;
+    margin-left: auto;
 }
 
 .friend-actions button {
@@ -1235,6 +1250,26 @@ h3 {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 12px;
+}
+
+.friend-modal-identity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.friend-modal-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 14px;
+    flex-shrink: 0;
 }
 
 .friend-modal-header h3 {

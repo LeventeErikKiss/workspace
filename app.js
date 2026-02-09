@@ -69,6 +69,8 @@ function updateUserUI(user) {
     if (headerStats) {
         headerStats.classList.toggle('hidden', isGuest);
     }
+
+    renderHeaderAvatar(initials || '👤');
 }
 
 function startAccountDeletionWatcher(user) {
@@ -615,6 +617,7 @@ function createChatContactItem(contact) {
     const avatar = document.createElement('div');
     avatar.className = 'chat-avatar';
     avatar.textContent = contact.initials || '🤖';
+    loadUserAvatarPreview(contact.email, avatar, contact.initials || '🤖');
 
     const meta = document.createElement('div');
     meta.className = 'friend-meta';
@@ -731,7 +734,8 @@ async function loadChatContacts() {
         id: 'assistant',
         name: 'Begivenheds vejleder',
         subtitle: 'AI assistent',
-        initials: 'AI'
+        initials: 'AI',
+        email: null
     };
     const current = getCurrentUser();
 
@@ -763,7 +767,7 @@ async function loadChatContacts() {
                 .join('')
                 .substring(0, 2)
                 .toUpperCase();
-            const contact = { id: email, name: user.name || email, subtitle: user.email || email, initials };
+            const contact = { id: email, name: user.name || email, subtitle: user.email || email, initials, email };
             contacts.push(contact);
             container.appendChild(createChatContactItem(contact));
         });
@@ -843,6 +847,7 @@ let currentAvatarState = {
 let avaturnAvatarData = null;
 let avaturnSdkLoaded = false;
 let avaturnInitInProgress = false;
+const userAvatarPreviewCache = new Map();
 const AVATURN_SDK_SOURCES = [
     { type: 'module', url: 'https://cdn.jsdelivr.net/npm/@avaturn/sdk/dist/index.js' },
     { type: 'module', url: 'https://unpkg.com/@avaturn/sdk/dist/index.js' },
@@ -1289,6 +1294,7 @@ async function saveAvaturnAvatar(data) {
     if (user.isGuest) {
         localStorage.setItem('guestAvaturnAvatar', JSON.stringify(payload));
         renderAvatarPreview();
+        renderHeaderAvatar();
         alert('✅ Avaturn avatar gemt lokalt for gæst.');
         return;
     }
@@ -1298,6 +1304,7 @@ async function saveAvaturnAvatar(data) {
         body: JSON.stringify({ data: payload })
     });
     renderAvatarPreview();
+    renderHeaderAvatar();
     alert('✅ Avaturn avatar gemt!');
 }
 
@@ -1367,6 +1374,53 @@ function getAvaturnPreviewUrl(data) {
     );
 }
 
+function applyAvatarImage(el, url) {
+    if (!el || !url) return;
+    el.textContent = '';
+    el.style.backgroundImage = `url('${url}')`;
+    el.style.backgroundSize = 'cover';
+    el.style.backgroundPosition = 'center';
+    el.style.backgroundRepeat = 'no-repeat';
+}
+
+async function loadUserAvatarPreview(email, el, fallbackText) {
+    if (!el) return;
+    if (fallbackText && !el.textContent) {
+        el.textContent = fallbackText;
+    }
+    if (!email) return;
+
+    if (userAvatarPreviewCache.has(email)) {
+        const cachedUrl = userAvatarPreviewCache.get(email);
+        if (cachedUrl) applyAvatarImage(el, cachedUrl);
+        return;
+    }
+
+    try {
+        const response = await apiRequest(`/api/avatar/${encodeURIComponent(email)}`);
+        const url = response?.data?.provider === 'avaturn'
+            ? getAvaturnPreviewUrl(response.data)
+            : null;
+        userAvatarPreviewCache.set(email, url || null);
+        if (url && el.isConnected) {
+            applyAvatarImage(el, url);
+        }
+    } catch (err) {
+        userAvatarPreviewCache.set(email, null);
+    }
+}
+
+function getInitialsFromUser(user) {
+    const seed = (user?.name || user?.email || '').trim();
+    if (!seed) return '👤';
+    return seed
+        .split(' ')
+        .map(part => part[0])
+        .join('')
+        .substring(0, 2)
+        .toUpperCase();
+}
+
 function renderAvatarPreview() {
     const previewCanvas = document.getElementById('avatarCanvasPreview');
     const container = document.querySelector('.avatar-canvas-clickable');
@@ -1390,6 +1444,29 @@ function renderAvatarPreview() {
 
     img.style.display = 'none';
     if (previewCanvas) previewCanvas.style.display = 'block';
+}
+
+function renderHeaderAvatar(fallbackInitials) {
+    const avatarCircle = document.getElementById('avatarInitials');
+    if (!avatarCircle) return;
+
+    const previewUrl = getAvaturnPreviewUrl(avaturnAvatarData);
+    if (previewUrl) {
+        avatarCircle.textContent = '';
+        avatarCircle.style.backgroundImage = `url('${previewUrl}')`;
+        avatarCircle.style.backgroundSize = 'cover';
+        avatarCircle.style.backgroundPosition = 'center';
+        avatarCircle.style.backgroundRepeat = 'no-repeat';
+        return;
+    }
+
+    avatarCircle.style.backgroundImage = '';
+    avatarCircle.style.backgroundSize = '';
+    avatarCircle.style.backgroundPosition = '';
+    avatarCircle.style.backgroundRepeat = '';
+    if (fallbackInitials) {
+        avatarCircle.textContent = fallbackInitials;
+    }
 }
 
 async function initAvaturn() {
@@ -1900,6 +1977,12 @@ function buildFriendItem(user, options = {}) {
     const item = document.createElement('div');
     item.className = 'friend-item';
 
+    const avatar = document.createElement('div');
+    avatar.className = 'friend-avatar';
+    const initials = getInitialsFromUser(user);
+    avatar.textContent = initials;
+    loadUserAvatarPreview(user.email, avatar, initials);
+
     const meta = document.createElement('div');
     meta.className = 'friend-meta';
 
@@ -1928,6 +2011,7 @@ function buildFriendItem(user, options = {}) {
         actions.appendChild(chip);
     }
 
+    item.appendChild(avatar);
     item.appendChild(meta);
     item.appendChild(actions);
 
@@ -1943,9 +2027,19 @@ function openFriendModal(user, distanceKm) {
     const modal = document.getElementById('friendModal');
     const name = document.getElementById('friendModalName');
     const info = document.getElementById('friendModalInfo');
+    const avatar = document.getElementById('friendModalAvatar');
     if (!modal || !name || !info) return;
 
     name.textContent = user.name || 'Profil';
+    if (avatar) {
+        const initials = getInitialsFromUser(user);
+        avatar.textContent = initials;
+        avatar.style.backgroundImage = '';
+        avatar.style.backgroundSize = '';
+        avatar.style.backgroundPosition = '';
+        avatar.style.backgroundRepeat = '';
+        loadUserAvatarPreview(user.email, avatar, initials);
+    }
     const distanceText = distanceKm ? `${distanceKm.toFixed(1)} km væk` : 'Afstand ukendt';
     info.innerHTML = `
         <div><strong>E-mail:</strong> ${user.email || 'Ukendt'}</div>
@@ -2906,6 +3000,7 @@ async function showDashboard(name, email, isGuest) {
     // Load saved appearance and init preview
     await loadAvatarAppearance();
     renderAvatarPreview();
+    renderHeaderAvatar();
     if (!avaturnAvatarData) {
         setTimeout(() => {
             initAvatarPreview();
@@ -3001,6 +3096,7 @@ async function applyUserToPage(user) {
 
     if (page === 'profile') {
         await loadAvatarAppearance();
+        renderHeaderAvatar();
         await initAvaturn();
         return;
     }
