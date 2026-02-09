@@ -1726,7 +1726,12 @@ function loadScript(url) {
 }
 
 function openProfilePage() {
-    navigateTo('/profile/');
+    const section = document.getElementById('dashboardAvatarSection');
+    if (section) {
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+    }
+    navigateTo('/');
 }
 
 function backToDashboard() {
@@ -3193,11 +3198,7 @@ async function showDashboard(name, email, isGuest) {
     await loadAvatarAppearance();
     renderAvatarPreview();
     renderHeaderAvatar();
-    if (!avaturnAvatarData) {
-        setTimeout(() => {
-            initAvatarPreview();
-        }, 100);
-    }
+    await initAvaturn();
 
     updateStatsUI();
     renderNotifications();
