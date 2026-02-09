@@ -1370,6 +1370,18 @@ function getAvaturnPreviewUrl(data) {
         exportData?.thumbnailUrl ||
         exportData?.avatar?.thumbnail?.url ||
         exportData?.avatar?.thumbnailUrl ||
+        exportData?.data?.avatar?.image?.url ||
+        exportData?.data?.avatar?.imageUrl ||
+        exportData?.data?.avatarImageUrl ||
+        exportData?.data?.preview?.url ||
+        exportData?.data?.previewUrl ||
+        exportData?.data?.thumbnailUrl ||
+        data?.data?.avatar?.image?.url ||
+        data?.data?.avatar?.imageUrl ||
+        data?.data?.avatarImageUrl ||
+        data?.data?.preview?.url ||
+        data?.data?.previewUrl ||
+        data?.data?.thumbnailUrl ||
         null
     );
 }
