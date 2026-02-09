@@ -81,9 +81,17 @@ function startAccountDeletionWatcher(user) {
             await apiRequestWithStatus(`/api/users/${encodeURIComponent(user.email)}`);
         } catch (err) {
             if (err.status === 404) {
-                stopAccountDeletionWatcher();
-                showAccountDeletedNotice();
-                handleLogout();
+                try {
+                    await apiRequest('/api/users/login', {
+                        method: 'POST',
+                        body: JSON.stringify({ name: user.name, email: user.email })
+                    });
+                    return;
+                } catch (restoreErr) {
+                    stopAccountDeletionWatcher();
+                    showAccountDeletedNotice();
+                    handleLogout();
+                }
             }
         }
     }, 20000);
@@ -2970,6 +2978,10 @@ function handleMitIDLogin() {
     document.getElementById('mitidInput').focus();
 }
 
+function getMitidProfileKey(cpr) {
+    return `mitidProfile:${cpr}`;
+}
+
 function closeMitIDModal() {
     document.getElementById('mitidModal').classList.remove('show');
     document.getElementById('mitidForm').classList.remove('hidden');
@@ -3007,11 +3019,33 @@ async function confirmMitIDLogin() {
 
     try {
         const user = await apiRequest(`/api/mitid/${encodeURIComponent(cprNumber)}`);
+        localStorage.setItem(getMitidProfileKey(cprNumber), JSON.stringify({
+            name: user.name,
+            email: user.email
+        }));
         await loginUser(user.name, user.email, false, { skipServerLogin: true });
         closeMitIDModal();
         return;
     } catch (err) {
         // continue to registration step
+    }
+
+    const cachedProfileRaw = localStorage.getItem(getMitidProfileKey(cprNumber));
+    if (cachedProfileRaw) {
+        try {
+            const cachedProfile = JSON.parse(cachedProfileRaw);
+            if (cachedProfile?.name && cachedProfile?.email) {
+                const user = await apiRequest('/api/mitid/register', {
+                    method: 'POST',
+                    body: JSON.stringify({ name: cachedProfile.name, email: cachedProfile.email, cpr: cprNumber })
+                });
+                await loginUser(user.name, user.email, false, { skipServerLogin: true });
+                closeMitIDModal();
+                return;
+            }
+        } catch (err) {
+            // fall through to manual register
+        }
     }
 
     pendingMitidCpr = cprNumber;
@@ -3046,6 +3080,7 @@ async function confirmMitIDRegister() {
             method: 'POST',
             body: JSON.stringify({ name, email, cpr: pendingMitidCpr })
         });
+        localStorage.setItem(getMitidProfileKey(pendingMitidCpr), JSON.stringify({ name, email }));
         await loginUser(user.name, user.email, false, { skipServerLogin: true });
         closeMitIDModal();
     } catch (err) {

@@ -452,11 +452,11 @@ h3 {
 
 .map-float {
     position: fixed;
-    bottom: 140px;
-    left: 24px;
-    right: auto;
-    width: 180px;
-    height: 180px;
+    bottom: 28px;
+    right: 28px;
+    left: auto;
+    width: 150px;
+    height: 150px;
     z-index: 300;
     cursor: pointer;
     transition: transform 0.2s;
@@ -957,9 +957,26 @@ h3 {
 }
 
 .avaturn-sdk-container button {
-    font-size: 12px;
-    padding: 6px 10px;
-    min-height: 28px;
+    font-size: 11px;
+    padding: 4px 8px;
+    min-height: 24px;
+    line-height: 1.1;
+}
+
+.avaturn-sdk-container .avaturn-ui button,
+.avaturn-sdk-container .avaturn-footer button,
+.avaturn-sdk-container [class*="avaturn"] button {
+    font-size: 11px;
+    padding: 4px 8px;
+    min-height: 24px;
+    line-height: 1.1;
+}
+
+.avaturn-sdk-container iframe {
+    transform: scale(0.92);
+    transform-origin: top left;
+    width: 108.7%;
+    height: 108.7%;
 }
 
 .avaturn-preview-image {
