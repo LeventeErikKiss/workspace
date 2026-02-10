@@ -12,6 +12,11 @@ body {
     color: #1f2933;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
+    --ui-scale: clamp(0.85, calc(100vw / 1440), 1.1);
+    transform: scale(var(--ui-scale));
+    transform-origin: top left;
+    width: calc(100% / var(--ui-scale));
+    min-height: calc(100vh / var(--ui-scale));
 }
 
 :root {
