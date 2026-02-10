@@ -347,6 +347,12 @@ h3 {
     cursor: pointer;
 }
 
+.footer-menu .footer-icon {
+    width: 24px;
+    height: 24px;
+    display: block;
+}
+
 .footer-menu button:hover {
     background-color: rgba(255, 255, 255, 0.2);
 }
