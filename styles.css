@@ -25,6 +25,7 @@ body {
     --shadow-soft: 0 8px 20px rgba(15, 23, 42, 0.12);
     --border-soft: 1px solid rgba(15, 23, 42, 0.08);
     --footer-offset: 90px;
+    --map-center-offset: 122px;
 }
 
 .video-bg {
@@ -466,7 +467,7 @@ h3 {
 .map-float {
     position: fixed;
     bottom: 120px;
-    left: 50%;
+    left: calc(50% + var(--map-center-offset));
     right: auto;
     transform: translateX(-50%);
     width: 150px;
@@ -482,7 +483,7 @@ h3 {
 }
 
 .map-float:hover {
-    transform: scale(1.05);
+    transform: translateX(-50%);
 }
 
 .map-card {
@@ -1699,6 +1700,10 @@ h3 {
 
     .course-title {
         font-size: 14px;
+    }
+
+    .map-float {
+        left: 50%;
     }
 }
 
